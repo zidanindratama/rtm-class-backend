@@ -1,0 +1,105 @@
+services:
+  api:
+    container_name: smartclass-api
+    profiles: ["prod"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: true
+      - path: .env.local
+        required: false
+    environment:
+      NODE_ENV: production
+      NODE_OPTIONS: ${NODE_OPTIONS:---no-network-family-autoselection --dns-result-order=ipv4first}
+      HTTP_PROXY: ${APP_HTTP_PROXY:-}
+      HTTPS_PROXY: ${APP_HTTPS_PROXY:-}
+      NO_PROXY: ${APP_NO_PROXY:-localhost,127.0.0.1,postgres,redis}
+      http_proxy: ${APP_HTTP_PROXY:-}
+      https_proxy: ${APP_HTTPS_PROXY:-}
+      no_proxy: ${APP_NO_PROXY:-localhost,127.0.0.1,postgres,redis}
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  api-dev:
+    container_name: smartclass-api-dev
+    profiles: ["dev"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: deps
+    working_dir: /app
+    command: ["sh", "-c", "npm run prisma:generate && npm run start:dev"]
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: true
+      - path: .env.local
+        required: false
+    environment:
+      NODE_ENV: development
+      NODE_OPTIONS: ${NODE_OPTIONS:---no-network-family-autoselection --dns-result-order=ipv4first}
+      CHOKIDAR_USEPOLLING: "true"
+      HTTP_PROXY: ${APP_HTTP_PROXY:-}
+      HTTPS_PROXY: ${APP_HTTPS_PROXY:-}
+      NO_PROXY: ${APP_NO_PROXY:-localhost,127.0.0.1,postgres,redis}
+      http_proxy: ${APP_HTTP_PROXY:-}
+      https_proxy: ${APP_HTTPS_PROXY:-}
+      no_proxy: ${APP_NO_PROXY:-localhost,127.0.0.1,postgres,redis}
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    container_name: smartclass-postgres
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - smartclass_rtm_backend_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    container_name: smartclass-redis
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_HOST_PORT:-6380}:6379"
+    volumes:
+      - smartclass_rtm_backend_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  smartclass_rtm_backend_postgres_data:
+    name: smartclass_rtm_backend_postgres_data
+  smartclass_rtm_backend_redis_data:
+    name: smartclass_rtm_backend_redis_data

@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum OtpPurpose {
+  PASSWORD_RESET
+}
+
+model User {
+  id            String         @id @default(cuid())
+  fullName      String
+  email         String         @unique
+  passwordHash  String
+  role          UserRole       @default(STUDENT)
+  isSuspended   Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  profile       Profile?
+  blogPosts     BlogPost[]
+  otpCodes      Otp[]
+  refreshTokens RefreshToken[]
+}
+
+model Profile {
+  id          String   @id @default(cuid())
+  userId       String   @unique
+  address      String?
+  phoneNumber  String?
+  pictureUrl   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BlogPost {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  excerpt     String?
+  content     String
+  isPublished Boolean  @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([isPublished, publishedAt])
+}
+
+model Otp {
+  id         String     @id @default(cuid())
+  purpose    OtpPurpose
+  codeHash   String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime   @default(now())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  tokenHash  String
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime @default(now())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
