@@ -1,6 +1,6 @@
 services:
   api:
-    container_name: smartclass-api
+    container_name: rtm-class-api
     profiles: ["prod"]
     build:
       context: .
@@ -30,7 +30,7 @@ services:
         condition: service_healthy
 
   api-dev:
-    container_name: smartclass-api-dev
+    container_name: rtm-class-api-dev
     profiles: ["dev"]
     build:
       context: .
@@ -48,6 +48,9 @@ services:
       NODE_ENV: development
       NODE_OPTIONS: ${NODE_OPTIONS:---no-network-family-autoselection --dns-result-order=ipv4first}
       CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      TSC_WATCHFILE: "FixedPollingInterval"
+      TSC_WATCHDIRECTORY: "DynamicPriorityPolling"
       HTTP_PROXY: ${APP_HTTP_PROXY:-}
       HTTPS_PROXY: ${APP_HTTPS_PROXY:-}
       NO_PROXY: ${APP_NO_PROXY:-localhost,127.0.0.1,postgres,redis}
@@ -66,7 +69,7 @@ services:
         condition: service_healthy
 
   postgres:
-    container_name: smartclass-postgres
+    container_name: rtm-class-postgres
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -76,7 +79,7 @@ services:
     ports:
       - "${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
-      - smartclass_rtm_backend_postgres_data:/var/lib/postgresql/data
+      - rtm_class_backend_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -84,14 +87,14 @@ services:
       retries: 5
 
   redis:
-    container_name: smartclass-redis
+    container_name: rtm-class-redis
     image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "${REDIS_HOST_PORT:-6380}:6379"
     volumes:
-      - smartclass_rtm_backend_redis_data:/data
+      - rtm_class_backend_redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -99,7 +102,7 @@ services:
       retries: 5
 
 volumes:
-  smartclass_rtm_backend_postgres_data:
-    name: smartclass_rtm_backend_postgres_data
-  smartclass_rtm_backend_redis_data:
-    name: smartclass_rtm_backend_redis_data
+  rtm_class_backend_postgres_data:
+    name: rtm_class_backend_postgres_data
+  rtm_class_backend_redis_data:
+    name: rtm_class_backend_redis_data

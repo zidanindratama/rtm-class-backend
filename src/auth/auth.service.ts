@@ -10,12 +10,15 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { ChangePasswordDto } from './dto/change-password.dto';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { LoginDto } from './dto/login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { RegisterDto } from './dto/register.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
+import {
+  ChangePasswordInput,
+  ForgotPasswordInput,
+  RefreshTokenInput,
+  SignInInput,
+  SignUpInput,
+  ResetPasswordInput,
+  UpdateProfileInput,
+} from './auth.schemas';
 import { JwtPayload } from './types';
 
 const SALT_ROUNDS = 10;
@@ -28,7 +31,7 @@ export class AuthService {
     private readonly mailService: MailService,
   ) {}
 
-  async register(dto: RegisterDto) {
+  async signUp(dto: SignUpInput) {
     const existingUser = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase() },
     });
@@ -54,7 +57,7 @@ export class AuthService {
     const tokens = await this.issueTokens(user);
 
     return {
-      message: 'Register successful',
+      message: 'Sign-up successful',
       data: {
         user: this.serializeUser(user),
         ...tokens,
@@ -62,7 +65,10 @@ export class AuthService {
     };
   }
 
-  async login(dto: LoginDto) {
+  async signIn(
+    dto: SignInInput,
+    scope: 'ANY' | 'ADMIN_ONLY' | 'TEACHER_STUDENT_ONLY' = 'ANY',
+  ) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase() },
       include: { profile: true },
@@ -79,11 +85,23 @@ export class AuthService {
     if (!isValidPassword) {
       throw new UnauthorizedException('Invalid email or password');
     }
+    if (scope === 'ADMIN_ONLY' && user.role !== UserRole.ADMIN) {
+      throw new UnauthorizedException('This endpoint is only for admin sign-in');
+    }
+    if (
+      scope === 'TEACHER_STUDENT_ONLY' &&
+      user.role !== UserRole.TEACHER &&
+      user.role !== UserRole.STUDENT
+    ) {
+      throw new UnauthorizedException(
+        'This endpoint is only for teacher/student sign-in',
+      );
+    }
 
     const tokens = await this.issueTokens(user);
 
     return {
-      message: 'Login successful',
+      message: 'Sign-in successful',
       data: {
         user: this.serializeUser(user),
         ...tokens,
@@ -91,7 +109,7 @@ export class AuthService {
     };
   }
 
-  async refreshToken(dto: RefreshTokenDto) {
+  async refreshToken(dto: RefreshTokenInput) {
     let payload: JwtPayload;
 
     try {
@@ -148,7 +166,7 @@ export class AuthService {
     };
   }
 
-  async logout(dto: RefreshTokenDto) {
+  async signOut(dto: RefreshTokenInput) {
     const tokenRows = await this.prisma.refreshToken.findMany({
       where: {
         revokedAt: null,
@@ -170,7 +188,7 @@ export class AuthService {
     }
 
     return {
-      message: 'Logout successful',
+      message: 'Sign-out successful',
       data: null,
     };
   }
@@ -192,7 +210,7 @@ export class AuthService {
     };
   }
 
-  async forgotPassword(dto: ForgotPasswordDto) {
+  async forgotPassword(dto: ForgotPasswordInput) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase() },
     });
@@ -226,7 +244,7 @@ export class AuthService {
     };
   }
 
-  async resetPassword(dto: ResetPasswordDto) {
+  async resetPassword(dto: ResetPasswordInput) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase() },
     });
@@ -277,7 +295,7 @@ export class AuthService {
     };
   }
 
-  async changePassword(userPayload: JwtPayload, dto: ChangePasswordDto) {
+  async changePassword(userPayload: JwtPayload, dto: ChangePasswordInput) {
     if (dto.currentPassword === dto.newPassword) {
       throw new BadRequestException(
         'New password must be different from current password',
@@ -312,6 +330,45 @@ export class AuthService {
     return {
       message: 'Password changed successfully. Please login again.',
       data: null,
+    };
+  }
+
+  async updateProfile(userPayload: JwtPayload, dto: UpdateProfileInput) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userPayload.sub },
+      include: { profile: true },
+    });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        fullName: dto.fullName,
+        profile: {
+          upsert: {
+            create: {
+              address: dto.address,
+              phoneNumber: dto.phoneNumber,
+              pictureUrl: dto.pictureUrl,
+            },
+            update: {
+              address: dto.address,
+              phoneNumber: dto.phoneNumber,
+              pictureUrl: dto.pictureUrl,
+            },
+          },
+        },
+      },
+      include: { profile: true },
+    });
+
+    return {
+      message: 'Profile updated',
+      data: {
+        user: this.serializeUser(updated),
+      },
     };
   }
 

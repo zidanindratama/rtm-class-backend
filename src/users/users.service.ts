@@ -4,12 +4,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { buildListMeta, clampSortOrder } from '../common/utils/list-query';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateUserAdminDto } from './dto/create-user-admin.dto';
-import { QueryUsersDto } from './dto/query-users.dto';
-import { UpdateUserAdminDto } from './dto/update-user-admin.dto';
+import {
+  CreateUserAdminInput,
+  QueryUsersInput,
+  UpdateUserAdminInput,
+} from './users.schemas';
 
 const SALT_ROUNDS = 10;
 const MANAGED_ROLES: UserRole[] = [UserRole.TEACHER, UserRole.STUDENT];
@@ -18,27 +21,37 @@ const MANAGED_ROLES: UserRole[] = [UserRole.TEACHER, UserRole.STUDENT];
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listUsers(query: QueryUsersDto) {
-    const users = await this.prisma.user.findMany({
-      where: {
-        role: query.role,
-        isSuspended: query.isSuspended,
-        OR: query.search
-          ? [
-              { fullName: { contains: query.search, mode: 'insensitive' } },
-              { email: { contains: query.search, mode: 'insensitive' } },
-            ]
-          : undefined,
-      },
-      include: {
-        profile: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+  async listUsers(query: QueryUsersInput) {
+    const where: Prisma.UserWhereInput = {
+      role: query.role,
+      isSuspended: query.isSuspended,
+      OR: query.search
+        ? [
+            { fullName: { contains: query.search, mode: 'insensitive' } },
+            { email: { contains: query.search, mode: 'insensitive' } },
+          ]
+        : undefined,
+    };
+
+    const [totalItems, users] = await this.prisma.$transaction([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        include: {
+          profile: true,
+        },
+        orderBy: {
+          [query.sort_by]: clampSortOrder(query.sort_order),
+        },
+        skip: (query.page - 1) * query.per_page,
+        take: query.per_page,
+      }),
+    ]);
 
     return {
       message: 'Users fetched',
       data: users.map((user) => this.serializeUser(user)),
+      meta: buildListMeta(totalItems, query.page, query.per_page),
     };
   }
 
@@ -58,7 +71,7 @@ export class UsersService {
     };
   }
 
-  async createUser(dto: CreateUserAdminDto) {
+  async createUser(dto: CreateUserAdminInput) {
     if (!MANAGED_ROLES.includes(dto.role)) {
       throw new BadRequestException('Admin can only create teacher or student accounts');
     }
@@ -96,7 +109,7 @@ export class UsersService {
     };
   }
 
-  async updateUser(id: string, dto: UpdateUserAdminDto) {
+  async updateUser(id: string, dto: UpdateUserAdminInput) {
     const existing = await this.prisma.user.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('User not found');

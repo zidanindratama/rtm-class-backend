@@ -3,42 +3,56 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { buildListMeta, clampSortOrder } from '../common/utils/list-query';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateBlogPostDto } from './dto/create-blog-post.dto';
-import { QueryBlogPostsDto } from './dto/query-blog-posts.dto';
-import { UpdateBlogPostDto } from './dto/update-blog-post.dto';
+import {
+  CreateBlogInput,
+  QueryBlogsInput,
+  UpdateBlogInput,
+} from './blogs.schemas';
 
 @Injectable()
-export class BlogService {
+export class BlogsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listPublishedPosts(query: QueryBlogPostsDto) {
-    const posts = await this.prisma.blogPost.findMany({
-      where: {
-        isPublished: true,
-        OR: query.search
-          ? [
-              { title: { contains: query.search, mode: 'insensitive' } },
-              { excerpt: { contains: query.search, mode: 'insensitive' } },
-              { content: { contains: query.search, mode: 'insensitive' } },
-            ]
-          : undefined,
-      },
-      include: {
-        author: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
+  async listPublishedPosts(query: QueryBlogsInput) {
+    const where: Prisma.BlogPostWhereInput = {
+      isPublished: true,
+      OR: query.search
+        ? [
+            { title: { contains: query.search, mode: 'insensitive' } },
+            { excerpt: { contains: query.search, mode: 'insensitive' } },
+            { content: { contains: query.search, mode: 'insensitive' } },
+          ]
+        : undefined,
+    };
+
+    const [totalItems, posts] = await this.prisma.$transaction([
+      this.prisma.blogPost.count({ where }),
+      this.prisma.blogPost.findMany({
+        where,
+        include: {
+          author: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+            },
           },
         },
-      },
-      orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
-    });
+        orderBy: {
+          [query.sort_by]: clampSortOrder(query.sort_order),
+        },
+        skip: (query.page - 1) * query.per_page,
+        take: query.per_page,
+      }),
+    ]);
 
     return {
       message: 'Published blog posts fetched',
       data: posts,
+      meta: buildListMeta(totalItems, query.page, query.per_page),
     };
   }
 
@@ -66,37 +80,47 @@ export class BlogService {
     };
   }
 
-  async adminListPosts(query: QueryBlogPostsDto) {
-    const posts = await this.prisma.blogPost.findMany({
-      where: {
-        isPublished: query.isPublished,
-        OR: query.search
-          ? [
-              { title: { contains: query.search, mode: 'insensitive' } },
-              { excerpt: { contains: query.search, mode: 'insensitive' } },
-              { content: { contains: query.search, mode: 'insensitive' } },
-            ]
-          : undefined,
-      },
-      include: {
-        author: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
+  async adminListPosts(query: QueryBlogsInput) {
+    const where: Prisma.BlogPostWhereInput = {
+      isPublished: query.isPublished,
+      OR: query.search
+        ? [
+            { title: { contains: query.search, mode: 'insensitive' } },
+            { excerpt: { contains: query.search, mode: 'insensitive' } },
+            { content: { contains: query.search, mode: 'insensitive' } },
+          ]
+        : undefined,
+    };
+
+    const [totalItems, posts] = await this.prisma.$transaction([
+      this.prisma.blogPost.count({ where }),
+      this.prisma.blogPost.findMany({
+        where,
+        include: {
+          author: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+            },
           },
         },
-      },
-      orderBy: [{ createdAt: 'desc' }],
-    });
+        orderBy: {
+          [query.sort_by]: clampSortOrder(query.sort_order),
+        },
+        skip: (query.page - 1) * query.per_page,
+        take: query.per_page,
+      }),
+    ]);
 
     return {
       message: 'Blog posts fetched',
       data: posts,
+      meta: buildListMeta(totalItems, query.page, query.per_page),
     };
   }
 
-  async createPost(adminId: string, dto: CreateBlogPostDto) {
+  async createPost(adminId: string, dto: CreateBlogInput) {
     const slug = await this.ensureUniqueSlug(dto.slug ?? this.slugify(dto.title));
 
     const post = await this.prisma.blogPost.create({
@@ -126,7 +150,7 @@ export class BlogService {
     };
   }
 
-  async updatePost(id: string, dto: UpdateBlogPostDto) {
+  async updatePost(id: string, dto: UpdateBlogInput) {
     const existing = await this.prisma.blogPost.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('Blog post not found');
@@ -149,9 +173,7 @@ export class BlogService {
         excerpt: dto.excerpt,
         content: dto.content,
         isPublished,
-        publishedAt: isPublished
-          ? existing.publishedAt ?? new Date()
-          : null,
+        publishedAt: isPublished ? existing.publishedAt ?? new Date() : null,
       },
       include: {
         author: {

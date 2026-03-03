@@ -6,7 +6,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { ApiResponse } from '../types/api-response.type';
@@ -34,7 +34,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
-      errorCode = HttpStatus[status] ?? 'HTTP_ERROR';
+      errorCode = this.mapHttpStatusToCode(status);
 
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
@@ -58,15 +58,30 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         } else if (
           exception.message &&
           exception.message !== 'Bad Request Exception' &&
-          exception.message !== 'Http Exception'
+          exception.message !== 'Http Exception' &&
+          exception.message !== 'Unprocessable Entity Exception'
         ) {
           message = exception.message;
         }
         if (status < HttpStatus.INTERNAL_SERVER_ERROR) {
-          details = payload.error ?? payload.details ?? payload;
+          const fallbackDetails = payload.error ?? payload.details ?? payload;
+          if (
+            typeof fallbackDetails === 'string' &&
+            ['Bad Request', 'Unauthorized', 'Forbidden', 'Not Found', 'Conflict'].includes(
+              fallbackDetails,
+            )
+          ) {
+            details = payload.details;
+          } else {
+            details = fallbackDetails;
+          }
         }
       }
-    } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+
+      if (!message || message === 'Unexpected server error') {
+        message = this.defaultMessageByStatus(status);
+      }
+    } else if (exception instanceof PrismaClientKnownRequestError) {
       const prismaMapped = this.mapPrismaKnownError(exception);
       status = prismaMapped.status;
       message = prismaMapped.message;
@@ -100,7 +115,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     response.status(status).json(errorPayload);
   }
 
-  private mapPrismaKnownError(error: Prisma.PrismaClientKnownRequestError): {
+  private mapPrismaKnownError(error: PrismaClientKnownRequestError): {
     status: HttpStatus;
     message: string;
     code: string;
@@ -134,5 +149,33 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       message: 'Database request failed',
       code: 'DB_REQUEST_FAILED',
     };
+  }
+
+  private mapHttpStatusToCode(status: number): string {
+    const statusCodeMap: Record<number, string> = {
+      [HttpStatus.BAD_REQUEST]: 'BAD_REQUEST',
+      [HttpStatus.UNAUTHORIZED]: 'UNAUTHORIZED',
+      [HttpStatus.FORBIDDEN]: 'FORBIDDEN',
+      [HttpStatus.NOT_FOUND]: 'NOT_FOUND',
+      [HttpStatus.CONFLICT]: 'CONFLICT',
+      [HttpStatus.UNPROCESSABLE_ENTITY]: 'VALIDATION_ERROR',
+      [HttpStatus.TOO_MANY_REQUESTS]: 'RATE_LIMITED',
+    };
+
+    return statusCodeMap[status] ?? HttpStatus[status] ?? 'HTTP_ERROR';
+  }
+
+  private defaultMessageByStatus(status: number): string {
+    const messageMap: Record<number, string> = {
+      [HttpStatus.BAD_REQUEST]: 'Bad request',
+      [HttpStatus.UNAUTHORIZED]: 'Unauthorized access',
+      [HttpStatus.FORBIDDEN]: 'Forbidden',
+      [HttpStatus.NOT_FOUND]: 'Resource not found',
+      [HttpStatus.CONFLICT]: 'Conflict',
+      [HttpStatus.UNPROCESSABLE_ENTITY]: 'Validation failed',
+      [HttpStatus.TOO_MANY_REQUESTS]: 'Too many requests',
+    };
+
+    return messageMap[status] ?? 'Unexpected server error';
   }
 }
