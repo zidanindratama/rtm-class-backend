@@ -45,9 +45,9 @@ export class MailService {
     });
 
     await transporter.sendMail({
-      from: `SmartClass AI <${user}>`,
+      from: `RTM Class <${user}>`,
       to: email,
-      subject: 'Kode OTP Reset Password SmartClass AI',
+      subject: 'Kode OTP Reset Password RTM Class',
       html,
     });
   }

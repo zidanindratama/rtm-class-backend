@@ -4,41 +4,152 @@ import {
   Controller,
   Get,
   Headers,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiHeader,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { ChangePasswordDto } from './dto/change-password.dto';
+import {
+  changePasswordSchema,
+  forgotPasswordSchema,
+  refreshTokenSchema,
+  resetPasswordSchema,
+  signInSchema,
+  signUpSchema,
+  updateProfileSchema,
+} from './auth.schemas';
 import { CurrentUser } from './current-user.decorator';
-import { ForgotPasswordDto } from './dto/forgot-password.dto';
-import { LoginDto } from './dto/login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { RegisterDto } from './dto/register.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtPayload } from './types';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 
 @Controller({ path: 'auth', version: '1' })
+@ApiTags('Auth')
+@ApiHeader({
+  name: 'x-client-domain',
+  required: true,
+  description: 'Frontend origin domain (example: https://my-domain.com)',
+  schema: { type: 'string', default: 'http://localhost:3000' },
+})
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('register')
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  @Post('sign-up')
+  @ApiOperation({
+    summary: 'Sign up',
+    description: 'Create new account. Role can be ADMIN, TEACHER, or STUDENT.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['fullName', 'email', 'password', 'role'],
+      properties: {
+        fullName: { type: 'string', example: 'Zidan Indratama' },
+        email: { type: 'string', format: 'email', example: 'zidan@example.com' },
+        password: { type: 'string', minLength: 8, example: 'P@ssw0rd123' },
+        role: {
+          type: 'string',
+          enum: ['ADMIN', 'TEACHER', 'STUDENT'],
+          example: 'STUDENT',
+        },
+      },
+    },
+  })
+  signUp(@Body(new ZodValidationPipe(signUpSchema)) dto: unknown) {
+    return this.authService.signUp(dto as any);
   }
 
-  @Post('login')
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  @Post('sign-in')
+  @ApiOperation({ summary: 'Sign in (all roles)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['email', 'password'],
+      properties: {
+        email: { type: 'string', format: 'email', example: 'zidan@example.com' },
+        password: { type: 'string', example: 'P@ssw0rd123' },
+      },
+    },
+  })
+  signIn(@Body(new ZodValidationPipe(signInSchema)) dto: unknown) {
+    return this.authService.signIn(dto as any, 'ANY');
+  }
+
+  @Post('sign-in/admin')
+  @ApiOperation({ summary: 'Sign in (admin only)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['email', 'password'],
+      properties: {
+        email: { type: 'string', format: 'email', example: 'admin@rtmclass.com' },
+        password: { type: 'string', example: 'AdminP@ssw0rd123' },
+      },
+    },
+  })
+  signInAdmin(@Body(new ZodValidationPipe(signInSchema)) dto: unknown) {
+    return this.authService.signIn(dto as any, 'ADMIN_ONLY');
+  }
+
+  @Post('sign-in/member')
+  @ApiOperation({ summary: 'Sign in (teacher or student only)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['email', 'password'],
+      properties: {
+        email: { type: 'string', format: 'email', example: 'teacher@rtmclass.com' },
+        password: { type: 'string', example: 'TeacherP@ssw0rd123' },
+      },
+    },
+  })
+  signInMember(@Body(new ZodValidationPipe(signInSchema)) dto: unknown) {
+    return this.authService.signIn(dto as any, 'TEACHER_STUDENT_ONLY');
   }
 
   @Post('refresh')
-  refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refreshToken(dto);
+  @ApiOperation({ summary: 'Refresh token pair' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['refreshToken'],
+      properties: {
+        refreshToken: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR...' },
+      },
+    },
+  })
+  refresh(@Body(new ZodValidationPipe(refreshTokenSchema)) dto: unknown) {
+    return this.authService.refreshToken(dto as any);
   }
 
-  @Post('logout')
-  logout(
+  @Post('sign-out')
+  @ApiOperation({
+    summary: 'Sign out',
+    description:
+      'Revoke refresh token. You can send refresh token in Authorization Bearer or request body.',
+  })
+  @ApiHeader({
+    name: 'authorization',
+    required: false,
+    description: 'Optional Bearer refresh token. Alternative: send refreshToken in body.',
+  })
+  @ApiBody({
+    required: false,
+    schema: {
+      type: 'object',
+      properties: {
+        refreshToken: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR...' },
+      },
+    },
+  })
+  signOut(
     @Headers('authorization') authorization?: string,
     @Body() body?: { refreshToken?: string },
   ) {
@@ -54,27 +165,88 @@ export class AuthController {
       );
     }
 
-    return this.authService.logout({ refreshToken });
+    return this.authService.signOut({ refreshToken });
   }
 
   @Post('forgot-password')
-  forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.forgotPassword(dto);
+  @ApiOperation({ summary: 'Send OTP for password reset' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['email'],
+      properties: {
+        email: { type: 'string', format: 'email', example: 'zidan@example.com' },
+      },
+    },
+  })
+  forgotPassword(@Body(new ZodValidationPipe(forgotPasswordSchema)) dto: unknown) {
+    return this.authService.forgotPassword(dto as any);
   }
 
   @Post('reset-password')
-  resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authService.resetPassword(dto);
+  @ApiOperation({ summary: 'Reset password using OTP' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['email', 'otpCode', 'newPassword'],
+      properties: {
+        email: { type: 'string', format: 'email', example: 'zidan@example.com' },
+        otpCode: { type: 'string', minLength: 6, maxLength: 6, example: '123456' },
+        newPassword: { type: 'string', minLength: 8, example: 'NewP@ssw0rd123' },
+      },
+    },
+  })
+  resetPassword(@Body(new ZodValidationPipe(resetPasswordSchema)) dto: unknown) {
+    return this.authService.resetPassword(dto as any);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('change-password')
-  changePassword(@CurrentUser() user: JwtPayload, @Body() dto: ChangePasswordDto) {
-    return this.authService.changePassword(user, dto);
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Change password (authenticated user)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['currentPassword', 'newPassword'],
+      properties: {
+        currentPassword: { type: 'string', example: 'OldP@ssw0rd123' },
+        newPassword: { type: 'string', minLength: 8, example: 'NewP@ssw0rd123' },
+      },
+    },
+  })
+  changePassword(
+    @CurrentUser() user: JwtPayload,
+    @Body(new ZodValidationPipe(changePasswordSchema)) dto: unknown,
+  ) {
+    return this.authService.changePassword(user, dto as any);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('profile')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Update own profile' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        fullName: { type: 'string', example: 'Updated Name' },
+        address: { type: 'string', example: 'Jakarta' },
+        phoneNumber: { type: 'string', example: '+62812345678' },
+        pictureUrl: { type: 'string', example: 'https://cdn.site/avatar.png' },
+      },
+    },
+  })
+  updateProfile(
+    @CurrentUser() user: JwtPayload,
+    @Body(new ZodValidationPipe(updateProfileSchema)) dto: unknown,
+  ) {
+    return this.authService.updateProfile(user, dto as any);
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get current user profile' })
   me(@CurrentUser() user: JwtPayload) {
     return this.authService.me(user);
   }

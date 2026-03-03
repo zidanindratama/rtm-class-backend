@@ -17,8 +17,13 @@ enum OtpPurpose {
   PASSWORD_RESET
 }
 
+enum ClassroomMemberRole {
+  TEACHER
+  STUDENT
+}
+
 model User {
-  id            String         @id @default(cuid())
+  id            String         @id @default(uuid())
   fullName      String
   email         String         @unique
   passwordHash  String
@@ -30,10 +35,16 @@ model User {
   blogPosts     BlogPost[]
   otpCodes      Otp[]
   refreshTokens RefreshToken[]
+  taughtClasses Classroom[]         @relation("ClassTeacher")
+  classMembers  ClassroomMember[]
+  forumThreads  ForumThread[]
+  forumComments ForumComment[]
+  threadVotes   ForumThreadUpvote[]
+  commentVotes  ForumCommentUpvote[]
 }
 
 model Profile {
-  id          String   @id @default(cuid())
+  id          String   @id @default(uuid())
   userId       String   @unique
   address      String?
   phoneNumber  String?
@@ -44,7 +55,7 @@ model Profile {
 }
 
 model BlogPost {
-  id          String   @id @default(cuid())
+  id          String   @id @default(uuid())
   title       String
   slug        String   @unique
   excerpt     String?
@@ -60,7 +71,7 @@ model BlogPost {
 }
 
 model Otp {
-  id         String     @id @default(cuid())
+  id         String     @id @default(uuid())
   purpose    OtpPurpose
   codeHash   String
   expiresAt  DateTime
@@ -73,7 +84,7 @@ model Otp {
 }
 
 model RefreshToken {
-  id         String   @id @default(cuid())
+  id         String   @id @default(uuid())
   tokenHash  String
   expiresAt  DateTime
   revokedAt  DateTime?
@@ -81,5 +92,97 @@ model RefreshToken {
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
+}
+
+model Classroom {
+  id              String            @id @default(uuid())
+  name            String
+  classCode       String            @unique
+  institutionName String?
+  classLevel      String?
+  academicYear    String?
+  description     String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  teacherId       String
+  teacher         User              @relation("ClassTeacher", fields: [teacherId], references: [id], onDelete: Restrict)
+  members         ClassroomMember[]
+  forumThreads    ForumThread[]
+
+  @@index([teacherId])
+  @@index([createdAt])
+}
+
+model ClassroomMember {
+  id          String             @id @default(uuid())
+  classroomId String
+  userId      String
+  role        ClassroomMemberRole
+  createdAt   DateTime           @default(now())
+  classroom   Classroom          @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, userId])
+  @@index([userId])
+}
+
+model ForumThread {
+  id          String            @id @default(uuid())
+  classroomId String
+  authorId    String
+  title       String
+  content     String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  classroom   Classroom         @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  author      User              @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments    ForumComment[]
+  upvotes     ForumThreadUpvote[]
+
+  @@index([classroomId, createdAt])
+  @@index([authorId])
+}
+
+model ForumComment {
+  id        String              @id @default(uuid())
+  threadId  String
+  authorId  String
+  parentId  String?
+  content   String
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  thread    ForumThread         @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author    User                @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent    ForumComment?       @relation("ForumCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   ForumComment[]      @relation("ForumCommentReplies")
+  upvotes   ForumCommentUpvote[]
+
+  @@index([threadId, createdAt])
+  @@index([authorId])
+  @@index([parentId])
+}
+
+model ForumThreadUpvote {
+  id        String      @id @default(uuid())
+  threadId  String
+  userId    String
+  createdAt DateTime    @default(now())
+  thread    ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, userId])
+  @@index([userId])
+}
+
+model ForumCommentUpvote {
+  id        String       @id @default(uuid())
+  commentId String
+  userId    String
+  createdAt DateTime     @default(now())
+  comment   ForumComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
   @@index([userId])
 }

@@ -1,10 +1,10 @@
 import {
   INestApplication,
-  ValidationPipe,
   VersioningType,
 } from '@nestjs/common';
 import helmet from 'helmet';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { ClientDomainGuard } from './common/guards/client-domain.guard';
 import { ApiResponseInterceptor } from './common/interceptors/api-response.interceptor';
 
 export function configureApp(app: INestApplication): void {
@@ -12,11 +12,15 @@ export function configureApp(app: INestApplication): void {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+  const normalizedCorsOrigins = corsOrigins.map((origin) =>
+    origin.toLowerCase().replace(/\/$/, ''),
+  );
 
   app.use(helmet());
   app.enableCors({
     origin: corsOrigins.length > 0 ? corsOrigins : true,
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-client-domain'],
   });
   app.setGlobalPrefix('api');
   app.enableVersioning({
@@ -24,14 +28,7 @@ export function configureApp(app: INestApplication): void {
     defaultVersion: '1',
   });
 
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
-  );
+  app.useGlobalGuards(new ClientDomainGuard(normalizedCorsOrigins));
   app.useGlobalInterceptors(new ApiResponseInterceptor());
   app.useGlobalFilters(new GlobalExceptionFilter());
 }

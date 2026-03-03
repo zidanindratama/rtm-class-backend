@@ -3,7 +3,9 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
-import { BlogModule } from './blog/blog.module';
+import { BlogsModule } from './blogs/blogs.module';
+import { ClassesModule } from './classes/classes.module';
+import { ForumsModule } from './forums/forums.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { UsersModule } from './users/users.module';
@@ -18,7 +20,9 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     UploadsModule,
     UsersModule,
-    BlogModule,
+    BlogsModule,
+    ClassesModule,
+    ForumsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
