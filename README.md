@@ -99,6 +99,7 @@ Notes:
 - `x-client-domain` header is required for API requests.
 - Protected routes require a valid Bearer access token.
 - Swagger UI auto-injects `x-client-domain` and can auto-store/reuse the latest access token after successful auth flows.
+- All entity IDs in API path/query/body use UUID v4 format (example: `550e8400-e29b-41d4-a716-446655440000`).
 
 ## Development Commands
 ```bash
@@ -115,6 +116,7 @@ npm run test:cov
 # prisma
 npm run prisma:generate
 npm run prisma:migrate:dev
+npm run prisma:seed
 npm run prisma:studio
 ```
 

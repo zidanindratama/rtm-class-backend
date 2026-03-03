@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  ParseUUIDPipe,
   Param,
   Post,
   Query,
@@ -12,6 +13,7 @@ import {
   ApiBody,
   ApiHeader,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
@@ -34,6 +36,7 @@ import { ClassesService } from './classes.service';
   name: 'x-client-domain',
   required: true,
   description: 'Frontend origin domain (example: https://my-domain.com)',
+  schema: { type: 'string', default: 'http://localhost:3000' },
 })
 @ApiBearerAuth('access-token')
 export class ClassesController {
@@ -55,7 +58,15 @@ export class ClassesController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get class detail by id' })
-  getClassById(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  getClassById(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
     return this.classesService.getClassById(user, id);
   }
 
@@ -101,6 +112,11 @@ export class ClassesController {
 
   @Get(':id/members')
   @ApiOperation({ summary: 'List class members' })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'per_page', required: false, example: 10 })
   @ApiQuery({ name: 'search', required: false, example: 'student' })
@@ -108,7 +124,7 @@ export class ClassesController {
   @ApiQuery({ name: 'sort_order', required: false, enum: ['asc', 'desc'] })
   listClassMembers(
     @CurrentUser() user: JwtPayload,
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Query(new ZodValidationPipe(queryClassMembersSchema)) query: unknown,
   ) {
     return this.classesService.listClassMembers(user, id, query as any);

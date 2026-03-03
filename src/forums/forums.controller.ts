@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  ParseUUIDPipe,
   Param,
   Post,
   Query,
@@ -12,6 +13,7 @@ import {
   ApiBody,
   ApiHeader,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
@@ -33,6 +35,7 @@ import { ForumsService } from './forums.service';
   name: 'x-client-domain',
   required: true,
   description: 'Frontend origin domain (example: https://my-domain.com)',
+  schema: { type: 'string', default: 'http://localhost:3000' },
 })
 @ApiBearerAuth('access-token')
 export class ForumsController {
@@ -40,7 +43,12 @@ export class ForumsController {
 
   @Get('threads')
   @ApiOperation({ summary: 'List forum threads by class' })
-  @ApiQuery({ name: 'classId', required: true, example: 'clz123abc' })
+  @ApiQuery({
+    name: 'classId',
+    required: true,
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    schema: { type: 'string', format: 'uuid' },
+  })
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'per_page', required: false, example: 10 })
   @ApiQuery({ name: 'search', required: false, example: 'homework' })
@@ -55,7 +63,15 @@ export class ForumsController {
 
   @Get('threads/:threadId')
   @ApiOperation({ summary: 'Get thread detail with nested comments' })
-  getThreadById(@CurrentUser() user: JwtPayload, @Param('threadId') threadId: string) {
+  @ApiParam({
+    name: 'threadId',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  getThreadById(
+    @CurrentUser() user: JwtPayload,
+    @Param('threadId', new ParseUUIDPipe({ version: '4' })) threadId: string,
+  ) {
     return this.forumsService.getThreadById(user, threadId);
   }
 
@@ -66,7 +82,11 @@ export class ForumsController {
       type: 'object',
       required: ['classId', 'title', 'content'],
       properties: {
-        classId: { type: 'string', example: 'clz123abc' },
+        classId: {
+          type: 'string',
+          format: 'uuid',
+          example: '550e8400-e29b-41d4-a716-446655440000',
+        },
         title: { type: 'string', example: 'Question about chapter 3' },
         content: { type: 'string', example: 'Can someone explain theorem 2?' },
       },
@@ -81,6 +101,11 @@ export class ForumsController {
 
   @Post('threads/:threadId/comments')
   @ApiOperation({ summary: 'Create comment on thread' })
+  @ApiParam({
+    name: 'threadId',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -92,7 +117,7 @@ export class ForumsController {
   })
   createComment(
     @CurrentUser() user: JwtPayload,
-    @Param('threadId') threadId: string,
+    @Param('threadId', new ParseUUIDPipe({ version: '4' })) threadId: string,
     @Body(new ZodValidationPipe(createForumCommentSchema)) body: unknown,
   ) {
     return this.forumsService.createComment(user, threadId, null, body as any);
@@ -100,6 +125,11 @@ export class ForumsController {
 
   @Post('comments/:commentId/replies')
   @ApiOperation({ summary: 'Reply to comment (nested reply)' })
+  @ApiParam({
+    name: 'commentId',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -111,7 +141,7 @@ export class ForumsController {
   })
   createReply(
     @CurrentUser() user: JwtPayload,
-    @Param('commentId') commentId: string,
+    @Param('commentId', new ParseUUIDPipe({ version: '4' })) commentId: string,
     @Body(new ZodValidationPipe(createForumCommentSchema)) body: unknown,
   ) {
     return this.forumsService.replyToComment(user, commentId, body as any);
@@ -119,15 +149,28 @@ export class ForumsController {
 
   @Post('threads/:threadId/upvote')
   @ApiOperation({ summary: 'Toggle thread upvote' })
-  toggleThreadUpvote(@CurrentUser() user: JwtPayload, @Param('threadId') threadId: string) {
+  @ApiParam({
+    name: 'threadId',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  toggleThreadUpvote(
+    @CurrentUser() user: JwtPayload,
+    @Param('threadId', new ParseUUIDPipe({ version: '4' })) threadId: string,
+  ) {
     return this.forumsService.toggleThreadUpvote(user, threadId);
   }
 
   @Post('comments/:commentId/upvote')
   @ApiOperation({ summary: 'Toggle comment upvote' })
+  @ApiParam({
+    name: 'commentId',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   toggleCommentUpvote(
     @CurrentUser() user: JwtPayload,
-    @Param('commentId') commentId: string,
+    @Param('commentId', new ParseUUIDPipe({ version: '4' })) commentId: string,
   ) {
     return this.forumsService.toggleCommentUpvote(user, commentId);
   }

@@ -10,6 +10,7 @@ import { BlogsService } from './blogs.service';
   name: 'x-client-domain',
   required: true,
   description: 'Frontend origin domain (example: https://my-domain.com)',
+  schema: { type: 'string', default: 'http://localhost:3000' },
 })
 export class BlogsPublicController {
   constructor(private readonly blogsService: BlogsService) {}

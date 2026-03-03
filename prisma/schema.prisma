@@ -23,7 +23,7 @@ enum ClassroomMemberRole {
 }
 
 model User {
-  id            String         @id @default(cuid())
+  id            String         @id @default(uuid())
   fullName      String
   email         String         @unique
   passwordHash  String
@@ -44,7 +44,7 @@ model User {
 }
 
 model Profile {
-  id          String   @id @default(cuid())
+  id          String   @id @default(uuid())
   userId       String   @unique
   address      String?
   phoneNumber  String?
@@ -55,7 +55,7 @@ model Profile {
 }
 
 model BlogPost {
-  id          String   @id @default(cuid())
+  id          String   @id @default(uuid())
   title       String
   slug        String   @unique
   excerpt     String?
@@ -71,7 +71,7 @@ model BlogPost {
 }
 
 model Otp {
-  id         String     @id @default(cuid())
+  id         String     @id @default(uuid())
   purpose    OtpPurpose
   codeHash   String
   expiresAt  DateTime
@@ -84,7 +84,7 @@ model Otp {
 }
 
 model RefreshToken {
-  id         String   @id @default(cuid())
+  id         String   @id @default(uuid())
   tokenHash  String
   expiresAt  DateTime
   revokedAt  DateTime?
@@ -96,7 +96,7 @@ model RefreshToken {
 }
 
 model Classroom {
-  id              String            @id @default(cuid())
+  id              String            @id @default(uuid())
   name            String
   classCode       String            @unique
   institutionName String?
@@ -115,7 +115,7 @@ model Classroom {
 }
 
 model ClassroomMember {
-  id          String             @id @default(cuid())
+  id          String             @id @default(uuid())
   classroomId String
   userId      String
   role        ClassroomMemberRole
@@ -128,7 +128,7 @@ model ClassroomMember {
 }
 
 model ForumThread {
-  id          String            @id @default(cuid())
+  id          String            @id @default(uuid())
   classroomId String
   authorId    String
   title       String
@@ -145,7 +145,7 @@ model ForumThread {
 }
 
 model ForumComment {
-  id        String              @id @default(cuid())
+  id        String              @id @default(uuid())
   threadId  String
   authorId  String
   parentId  String?
@@ -164,7 +164,7 @@ model ForumComment {
 }
 
 model ForumThreadUpvote {
-  id        String      @id @default(cuid())
+  id        String      @id @default(uuid())
   threadId  String
   userId    String
   createdAt DateTime    @default(now())
@@ -176,7 +176,7 @@ model ForumThreadUpvote {
 }
 
 model ForumCommentUpvote {
-  id        String       @id @default(cuid())
+  id        String       @id @default(uuid())
   commentId String
   userId    String
   createdAt DateTime     @default(now())

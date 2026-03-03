@@ -8,6 +8,7 @@ import { AppService, AppStatusResponse } from './app.service';
   name: 'x-client-domain',
   required: true,
   description: 'Frontend origin domain (example: https://my-domain.com)',
+  schema: { type: 'string', default: 'http://localhost:3000' },
 })
 export class AppController {
   constructor(private readonly appService: AppService) {}

@@ -21,6 +21,7 @@ import { UploadsService } from './uploads.service';
   name: 'x-client-domain',
   required: true,
   description: 'Frontend origin domain (example: https://my-domain.com)',
+  schema: { type: 'string', default: 'http://localhost:3000' },
 })
 export class UploadsController {
   constructor(private svc: UploadsService) {}

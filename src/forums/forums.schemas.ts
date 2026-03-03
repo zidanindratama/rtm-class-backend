@@ -4,12 +4,12 @@ import { paginationQuerySchema } from '../common/schemas/pagination.schema';
 export const forumsSortFields = ['createdAt', 'title'] as const;
 
 export const listForumThreadsSchema = paginationQuerySchema.extend({
-  classId: z.string().trim().min(1),
+  classId: z.string().uuid(),
   sort_by: z.enum(forumsSortFields).default('createdAt'),
 });
 
 export const createForumThreadSchema = z.object({
-  classId: z.string().trim().min(1),
+  classId: z.string().uuid(),
   title: z.string().trim().min(3),
   content: z.string().trim().min(3),
 });

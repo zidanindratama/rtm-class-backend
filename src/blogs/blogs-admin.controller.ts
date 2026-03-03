@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  ParseUUIDPipe,
   Param,
   Patch,
   Post,
@@ -15,6 +16,7 @@ import {
   ApiBody,
   ApiHeader,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
@@ -39,6 +41,7 @@ import { BlogsService } from './blogs.service';
   name: 'x-client-domain',
   required: true,
   description: 'Frontend origin domain (example: https://my-domain.com)',
+  schema: { type: 'string', default: 'http://localhost:3000' },
 })
 @ApiBearerAuth('access-token')
 export class BlogsAdminController {
@@ -84,6 +87,11 @@ export class BlogsAdminController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update blog post' })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -97,7 +105,7 @@ export class BlogsAdminController {
     },
   })
   updatePost(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body(new ZodValidationPipe(updateBlogSchema)) dto: unknown,
   ) {
     return this.blogsService.updatePost(id, dto as any);
@@ -105,7 +113,12 @@ export class BlogsAdminController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete blog post' })
-  deletePost(@Param('id') id: string) {
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  deletePost(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.blogsService.deletePost(id);
   }
 }

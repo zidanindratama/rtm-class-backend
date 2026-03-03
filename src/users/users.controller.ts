@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  ParseUUIDPipe,
   Param,
   Patch,
   Post,
@@ -15,6 +16,7 @@ import {
   ApiBody,
   ApiHeader,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
@@ -38,6 +40,7 @@ import { UsersService } from './users.service';
   name: 'x-client-domain',
   required: true,
   description: 'Frontend origin domain (example: https://my-domain.com)',
+  schema: { type: 'string', default: 'http://localhost:3000' },
 })
 @ApiBearerAuth('access-token')
 export class UsersController {
@@ -66,7 +69,12 @@ export class UsersController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get user by id' })
-  getUserById(@Param('id') id: string) {
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  getUserById(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.usersService.getUserById(id);
   }
 
@@ -94,6 +102,11 @@ export class UsersController {
 
   @Patch(':id')
   @ApiOperation({ summary: 'Update user by id' })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -110,7 +123,7 @@ export class UsersController {
     },
   })
   updateUser(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body(new ZodValidationPipe(updateUserAdminSchema)) dto: unknown,
   ) {
     return this.usersService.updateUser(id, dto as any);
@@ -118,6 +131,11 @@ export class UsersController {
 
   @Patch(':id/suspend')
   @ApiOperation({ summary: 'Suspend / unsuspend user' })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -128,7 +146,7 @@ export class UsersController {
     },
   })
   suspendUser(
-    @Param('id') id: string,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body(new ZodValidationPipe(suspendUserSchema)) dto: unknown,
   ) {
     return this.usersService.setSuspendStatus(id, (dto as any).suspended);
@@ -136,7 +154,12 @@ export class UsersController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete user by id' })
-  deleteUser(@Param('id') id: string) {
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  deleteUser(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.usersService.deleteUser(id);
   }
 }

@@ -36,6 +36,7 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
   name: 'x-client-domain',
   required: true,
   description: 'Frontend origin domain (example: https://my-domain.com)',
+  schema: { type: 'string', default: 'http://localhost:3000' },
 })
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
