@@ -137,7 +137,8 @@ function hasPaginationQuery(operation: any): boolean {
   if (!Array.isArray(operation?.parameters)) return false;
 
   return operation.parameters.some((parameter: any) => {
-    if (!parameter || typeof parameter !== 'object' || '$ref' in parameter) return false;
+    if (!parameter || typeof parameter !== 'object' || '$ref' in parameter)
+      return false;
     return (
       parameter.in === 'query' &&
       (parameter.name === 'page' || parameter.name === 'per_page')
@@ -151,7 +152,8 @@ function isProtectedOperation(operation: any): boolean {
 
 function buildSuccessExample(operation: any, method: string) {
   const summary =
-    typeof operation?.summary === 'string' && operation.summary.trim().length > 0
+    typeof operation?.summary === 'string' &&
+    operation.summary.trim().length > 0
       ? operation.summary.trim()
       : 'Request';
   const isListEndpoint = method === 'get' && hasPaginationQuery(operation);
@@ -213,7 +215,10 @@ function enrichSwaggerDocument(document: any): void {
       code: { type: 'string', example: 'BAD_REQUEST' },
       details: {
         nullable: true,
-        oneOf: [{ type: 'string' }, { type: 'object', additionalProperties: true }],
+        oneOf: [
+          { type: 'string' },
+          { type: 'object', additionalProperties: true },
+        ],
       },
     },
   };
@@ -272,7 +277,10 @@ function enrichSwaggerDocument(document: any): void {
             description: 'Authentication required or token invalid',
             content: {
               'application/json': {
-                example: buildErrorExample('UNAUTHORIZED', 'Unauthorized access'),
+                example: buildErrorExample(
+                  'UNAUTHORIZED',
+                  'Unauthorized access',
+                ),
               },
             },
           };
@@ -280,7 +288,8 @@ function enrichSwaggerDocument(document: any): void {
 
         if (!operation.responses['403']) {
           operation.responses['403'] = {
-            description: 'Authenticated but not allowed to access this resource',
+            description:
+              'Authenticated but not allowed to access this resource',
             content: {
               'application/json': {
                 example: buildErrorExample('FORBIDDEN', 'Forbidden'),
@@ -343,32 +352,6 @@ export function configureSwagger(app: INestApplication): void {
         '- Every request must include header `x-client-domain` (e.g. `https://my-domain.com`).',
         '- For protected endpoints, also include `Authorization: Bearer <access_token>`.',
         '- Standard response format for all endpoints:',
-        '```json',
-        '{',
-        '  "message": "Request successful",',
-        '  "data": {},',
-        '  "meta": null,',
-        '  "error": null',
-        '}',
-        '```',
-        '- Error format for all endpoints:',
-        '```json',
-        '{',
-        '  "message": "Validation failed",',
-        '  "data": null,',
-        '  "meta": null,',
-        '  "error": {',
-        '    "code": "BAD_REQUEST",',
-        '    "details": {}',
-        '  }',
-        '}',
-        '```',
-        '',
-        '## Auth Flow',
-        '1. Sign up or sign in using `/api/v1/auth/sign-up` or `/api/v1/auth/sign-in`.',
-        '2. Use `access_token` for protected endpoints.',
-        '3. Use `/api/v1/auth/refresh` to renew tokens.',
-        '4. Use `/api/v1/auth/sign-out` to revoke refresh token.',
       ].join('\n'),
     )
     .setVersion('1.0')
