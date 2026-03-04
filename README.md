@@ -79,7 +79,13 @@ npm run start:dev:local
 Development profile:
 ```bash
 npm run docker:up:dev
+npm run docker:up:dev:detached
 ```
+
+Notes:
+- `npm run docker:up:dev:detached` now auto-runs database initialization (`prisma migrate dev` + `prisma db seed`) after containers start.
+- This is useful after `npm run docker:down` (which uses `down -v`), because PostgreSQL volume/data is recreated from scratch.
+- Seeding will repopulate sample/default data each time initialization runs.
 
 Production profile:
 ```bash
