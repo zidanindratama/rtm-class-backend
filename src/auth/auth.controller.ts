@@ -73,8 +73,8 @@ export class AuthController {
       type: 'object',
       required: ['email', 'password'],
       properties: {
-        email: { type: 'string', format: 'email', example: 'zidan@example.com' },
-        password: { type: 'string', example: 'P@ssw0rd123' },
+        email: { type: 'string', format: 'email', example: 'admin.1@rtmclass.test' },
+        password: { type: 'string', example: 'Password123!' },
       },
     },
   })
@@ -89,8 +89,8 @@ export class AuthController {
       type: 'object',
       required: ['email', 'password'],
       properties: {
-        email: { type: 'string', format: 'email', example: 'admin@rtmclass.com' },
-        password: { type: 'string', example: 'AdminP@ssw0rd123' },
+        email: { type: 'string', format: 'email', example: 'admin.1@rtmclass.test' },
+        password: { type: 'string', example: 'Password123!' },
       },
     },
   })
@@ -105,8 +105,8 @@ export class AuthController {
       type: 'object',
       required: ['email', 'password'],
       properties: {
-        email: { type: 'string', format: 'email', example: 'teacher@rtmclass.com' },
-        password: { type: 'string', example: 'TeacherP@ssw0rd123' },
+        email: { type: 'string', format: 'email', example: 'teacher.1@rtmclass.test' },
+        password: { type: 'string', example: 'Password123!' },
       },
     },
   })

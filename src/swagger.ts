@@ -132,6 +132,20 @@ const swaggerHelperScript = `
 `;
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
+const DEFAULT_UUID = '550e8400-e29b-41d4-a716-446655440000';
+
+const COMMON_QUERY_DEFAULTS: Record<string, unknown> = {
+  page: 1,
+  per_page: 10,
+  sort_order: 'desc',
+};
+
+const COMMON_QUERY_EXAMPLES: Record<string, unknown> = {
+  classId: DEFAULT_UUID,
+  materialId: DEFAULT_UUID,
+  isPublished: true,
+  isSuspended: false,
+};
 
 function hasPaginationQuery(operation: any): boolean {
   if (!Array.isArray(operation?.parameters)) return false;
@@ -231,6 +245,42 @@ function enrichSwaggerDocument(document: any): void {
     HTTP_METHODS.forEach((method) => {
       const operation = pathItem?.[method];
       if (!operation) return;
+
+      if (Array.isArray(operation.parameters)) {
+        operation.parameters.forEach((parameter: any) => {
+          if (!parameter || typeof parameter !== 'object' || '$ref' in parameter) {
+            return;
+          }
+
+          const name = parameter.name;
+          const schema = (parameter.schema ??= {});
+
+          if (
+            parameter.in === 'path' &&
+            (schema.format === 'uuid' || name === 'id' || name?.endsWith('Id')) &&
+            parameter.example === undefined
+          ) {
+            parameter.example = DEFAULT_UUID;
+          }
+
+          if (parameter.in === 'query') {
+            if (schema.default === undefined && name in COMMON_QUERY_DEFAULTS) {
+              schema.default = COMMON_QUERY_DEFAULTS[name];
+            }
+            if (parameter.example === undefined && name in COMMON_QUERY_EXAMPLES) {
+              parameter.example = COMMON_QUERY_EXAMPLES[name];
+            }
+            if (
+              name === 'sort_order' &&
+              Array.isArray(schema.enum) &&
+              schema.enum.includes('desc') &&
+              parameter.example === undefined
+            ) {
+              parameter.example = 'desc';
+            }
+          }
+        });
+      }
 
       if (!operation.description || operation.description.trim().length === 0) {
         operation.description = [
@@ -346,15 +396,65 @@ export function configureSwagger(app: INestApplication): void {
     .setTitle('RTM Class API')
     .setDescription(
       [
-        'Backend API documentation for RTM Class.',
+        'Comprehensive backend API documentation for RTM Class.',
+        '',
+        'Use this page as an interactive Postman alternative: click an endpoint, press **Try it out**, then **Execute**.',
+        '',
+        '## Quick Start (Recommended for Testing)',
+        '1. Call `POST /api/v1/auth/sign-in`.',
+        '2. Use seeded credential example:',
+        '   - `email`: `admin.1@rtmclass.test`',
+        '   - `password`: `Password123!`',
+        '3. After success, access token is auto-saved and auto-applied to protected routes.',
+        '4. Execute protected endpoints directly from Swagger UI.',
         '',
         '## Global Request Rules',
         '- Every request must include header `x-client-domain` (e.g. `https://my-domain.com`).',
+        '- Swagger UI auto-fills and remembers `x-client-domain` between sessions.',
         '- For protected endpoints, also include `Authorization: Bearer <access_token>`.',
+        '- For file upload, use endpoint `POST /api/uploads` and attach `file` as multipart/form-data.',
         '- Standard response format for all endpoints:',
       ].join('\n'),
     )
-    .setVersion('1.0')
+    .setVersion('1.1.0')
+    .addServer('http://localhost:5000', 'Local development')
+    .addTag(
+      'Auth',
+      'Authentication, token lifecycle, password recovery, and self-profile operations.',
+    )
+    .addTag(
+      'Users (Admin)',
+      'Administrative user management: list, create, update, suspend, and delete users.',
+    )
+    .addTag(
+      'Classes',
+      'Classroom lifecycle: create class, join by code, fetch details, and manage memberships.',
+    )
+    .addTag(
+      'Materials',
+      'Material metadata and content generation outputs for classroom learning resources.',
+    )
+    .addTag(
+      'AI Jobs',
+      'Queue and monitor asynchronous AI transformations for materials, including provider callbacks.',
+    )
+    .addTag(
+      'Forums',
+      'Classroom discussion threads, nested comments, replies, and upvote interactions.',
+    )
+    .addTag(
+      'Blogs (Public)',
+      'Public-facing published blog listing and detail endpoints.',
+    )
+    .addTag(
+      'Blogs (Admin)',
+      'Administrative blog content management for drafting, publishing, editing, and deletion.',
+    )
+    .addTag(
+      'Uploads',
+      'File upload endpoint backed by Cloudinary for storing assets/materials.',
+    )
+    .addTag('System', 'Basic health/welcome endpoint.')
     .addBearerAuth(
       {
         type: 'http',
@@ -373,6 +473,10 @@ export function configureSwagger(app: INestApplication): void {
     swaggerOptions: {
       persistAuthorization: true,
       displayRequestDuration: true,
+      tryItOutEnabled: true,
+      docExpansion: 'list',
+      tagsSorter: 'alpha',
+      operationsSorter: 'alpha',
     },
     customJsStr: swaggerHelperScript,
   });

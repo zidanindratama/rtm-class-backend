@@ -1,121 +1,114 @@
 # RTM Class Backend
 
-RTM Class Backend is a NestJS API for classroom operations, account management, forums, blogs, and media uploads.
+NestJS backend API for RTM Class platform: authentication, user/class management, forum, blog, materials, AI job orchestration, and file upload.
 
-## Tech Stack
+## Core Stack
 - NestJS 10
-- Prisma ORM
-- PostgreSQL
+- Prisma + PostgreSQL
 - Redis
-- JWT authentication
-- Zod request validation
-- Swagger (OpenAPI)
-- Cloudinary (file uploads)
+- JWT authentication (access + refresh)
+- Zod validation
+- Swagger OpenAPI
+- Cloudinary upload
 
-## Current Features
-- Authentication and authorization
-- Role-based access control (`ADMIN`, `TEACHER`, `STUDENT`)
-- JWT access + refresh token flow
-- Forgot/reset password with OTP flow
-- Profile and password management for authenticated users
-- Admin user management (create, update, suspend, delete, list)
-- Class management (create, join by class code, members, access-based listing)
-- Forum discussions with nested replies and upvotes
-- Blog system with public read access and admin content management
-- File upload integration to Cloudinary
-- Unified API response format via global interceptor
-- Global exception handling and standardized error responses
-- Global request validation with Zod schemas
-- Required client-domain guard through `x-client-domain` header
-- API versioning (`/api/v1`)
+## Main Features
+- Auth flow: sign up, sign in, refresh, sign out
+- OTP forgot/reset password flow
+- Role-based access (`ADMIN`, `TEACHER`, `STUDENT`)
+- Admin users management
+- Classes: create, join by class code, members listing
+- Materials and AI outputs
+- AI jobs queue and callback handling
+- Classroom forums (threads, comments, replies, upvotes)
+- Blogs (public read + admin CMS)
+- Cloudinary file uploads
+- Standardized API response envelope
 
-## Project Structure
-```text
-src/
-  auth/
-  blogs/
-  classes/
-  forums/
-  uploads/
-  users/
-  common/
-  prisma/
-  bootstrap.ts
-  swagger.ts
-  main.ts
-```
+## API Base URLs
+- API base: `http://localhost:5000/api/v1`
+- Swagger UI: `http://localhost:5000/docs`
+- OpenAPI JSON: `http://localhost:5000/docs-json`
+
+## Swagger Quick Start (Click-Only)
+Swagger is configured for interactive usage like Postman:
+- `x-client-domain` header auto-filled and persisted
+- Access token auto-captured after successful auth calls
+- Bearer auth auto-persisted for protected endpoints
+- Request duration shown in UI
+
+Recommended first call:
+1. Open `POST /api/v1/auth/sign-in`
+2. Use seeded credentials:
+   - `email`: `admin.1@rtmclass.test`
+   - `password`: `Password123!`
+3. Execute, then continue to protected endpoints directly.
+
+Additional seeded examples:
+- Admin: `admin.1@rtmclass.test`
+- Teacher: `teacher.1@rtmclass.test`
+- Student: `student.1@rtmclass.test`
+- Default password for seeded users: `Password123!`
 
 ## Prerequisites
 - Node.js 20+
 - npm
 - Docker Desktop
 
-## Setup
-1. Install dependencies:
-```bash
-npm install
-```
-2. Create environment files:
+## Environment Setup
+1. Create env files:
 ```bash
 copy .env.example .env
 copy .env.local.example .env.local
 ```
+2. Fill required values (minimum):
+- `JWT_ACCESS_SECRET`
+- `JWT_REFRESH_SECRET`
+- `DATABASE_URL`
+- `REDIS_URL`
+- Mail credentials (`EMAIL_USER`, `EMAIL_APP_PASSWORD`) if testing OTP email
+- Cloudinary credentials for upload endpoint
+- AI integration variables if testing AI endpoints/callbacks
 
-## Run the Application
+## Run Options
 
-### Option 1: Hybrid Local Development (recommended)
-Run API locally, keep PostgreSQL and Redis in Docker.
-
-1. Start infrastructure services:
+### Option 1: Local API + Docker DB/Redis (recommended)
 ```bash
 docker compose up -d postgres redis
-```
-2. Run API in watch mode:
-```bash
+npm install
+npm run prisma:generate
+npm run prisma:migrate:dev
+npm run prisma:seed
 npm run start:dev:local
 ```
 
-### Option 2: Full Docker
-Development profile:
+### Option 2: Full Docker Development Profile
 ```bash
 npm run docker:up:dev
+```
+Detached mode:
+```bash
 npm run docker:up:dev:detached
 ```
 
-Notes:
-- `npm run docker:up:dev:detached` now auto-runs database initialization (`prisma migrate dev` + `prisma db seed`) after containers start.
-- This is useful after `npm run docker:down` (which uses `down -v`), because PostgreSQL volume/data is recreated from scratch.
-- Seeding will repopulate sample/default data each time initialization runs.
-
-Production profile:
+### Option 3: Full Docker Production Profile
 ```bash
 npm run docker:up:prod
 ```
 
-Stop all containers:
+Stop containers:
 ```bash
 npm run docker:down
 ```
 
-## API Docs
-- Swagger UI: `http://localhost:5000/docs`
-- OpenAPI JSON: `http://localhost:5000/docs-json`
-
-Notes:
-- `x-client-domain` header is required for API requests.
-- Protected routes require a valid Bearer access token.
-- Swagger UI auto-injects `x-client-domain` and can auto-store/reuse the latest access token after successful auth flows.
-- All entity IDs in API path/query/body use UUID v4 format (example: `550e8400-e29b-41d4-a716-446655440000`).
-
 ## Development Commands
 ```bash
-# build
+# app
+npm run start:dev
 npm run build
+npm run start:prod
 
-# lint
+# quality
 npm run lint
-
-# tests
 npm run test
 npm run test:cov
 
@@ -126,19 +119,23 @@ npm run prisma:seed
 npm run prisma:studio
 ```
 
+## API Modules
+- `Auth`
+- `Users (Admin)`
+- `Classes`
+- `Materials`
+- `AI Jobs`
+- `Forums`
+- `Blogs (Public)`
+- `Blogs (Admin)`
+- `Uploads`
+- `System`
+
+## Notes
+- Global prefix: `/api`
+- API versioning: `/v1`
+- Required header for API calls: `x-client-domain`
+- Upload endpoint is currently available at `/api/uploads`
+
 ## Changelog
-
-### 2026-03-03
-- Refactored bootstrap flow by extracting Swagger configuration from `main.ts` into `src/swagger.ts`.
-- Added clearer separation of concerns between app initialization (`bootstrap.ts`) and API documentation setup (`swagger.ts`).
-- Improved project documentation with a complete English README focused on capabilities and architecture.
-
-### Existing Baseline (from current codebase)
-- Implemented auth module with role-aware sign-in variants and refresh/sign-out support.
-- Implemented OTP-based forgot/reset password and authenticated password change.
-- Added admin-managed users module with suspension controls.
-- Added classes module with join-by-code and member listing.
-- Added forums module with threaded comments/replies and upvote toggles.
-- Added blogs module for public publishing and admin CMS operations.
-- Added Cloudinary-based uploads module.
-- Added global exception filter, global API response interceptor, and client-domain request guard.
+Detailed history is in [CHANGELOG.md](CHANGELOG.md).

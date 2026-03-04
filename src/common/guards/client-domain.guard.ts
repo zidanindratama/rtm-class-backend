@@ -14,11 +14,13 @@ export class ClientDomainGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<Request>();
     const url = req.url ?? '';
+    const pathOnly = url.split('?')[0];
 
     if (
       req.method === 'OPTIONS' ||
       url.startsWith('/docs') ||
-      url.startsWith('/docs-json')
+      url.startsWith('/docs-json') ||
+      /\/api\/v\d+\/ai\/jobs\/[^/]+\/callback$/.test(pathOnly)
     ) {
       return true;
     }

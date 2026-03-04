@@ -1,6 +1,9 @@
 import { faker } from '@faker-js/faker';
 import {
+  AIJobStatus,
+  AIJobType,
   ClassroomMemberRole,
+  MaterialStatus,
   OtpPurpose,
   Prisma,
   PrismaClient,
@@ -21,6 +24,8 @@ const COUNTS = {
   refreshTokens: 20,
   threadPerClassroom: 2,
   commentsPerThread: 3,
+  materialsPerClassroom: 2,
+  aiJobsPerMaterial: 2,
 };
 
 const PASSWORD_PLAIN = 'Password123!';
@@ -61,6 +66,9 @@ function createUserInputs(
 }
 
 async function clearDatabase() {
+  await prisma.aiOutput.deleteMany();
+  await prisma.aiJob.deleteMany();
+  await prisma.material.deleteMany();
   await prisma.forumCommentUpvote.deleteMany();
   await prisma.forumThreadUpvote.deleteMany();
   await prisma.forumComment.deleteMany();
@@ -175,6 +183,148 @@ async function main() {
     membersByClassroom.set(member.classroomId, existing);
   }
 
+  const materials: {
+    id: string;
+    classroomId: string;
+    uploadedById: string;
+  }[] = [];
+
+  for (const classroom of classrooms) {
+    for (let i = 0; i < COUNTS.materialsPerClassroom; i += 1) {
+      const material = await prisma.material.create({
+        data: {
+          classroomId: classroom.id,
+          uploadedById: classroom.teacherId,
+          title: titleCase(`Materi ${faker.word.noun()} ${i + 1}`),
+          description: faker.lorem.sentence(),
+          fileUrl: faker.internet.url(),
+          fileMimeType: faker.helpers.arrayElement([
+            'application/pdf',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'text/plain',
+          ]),
+          status: MaterialStatus.UPLOADED,
+        },
+        select: { id: true, classroomId: true, uploadedById: true },
+      });
+
+      materials.push(material);
+    }
+  }
+
+  const availableJobTypes = [AIJobType.MCQ, AIJobType.ESSAY, AIJobType.SUMMARY];
+  const materialJobStatusMap = new Map<string, AIJobStatus[]>();
+  const aiJobIds: string[] = [];
+  let aiOutputsCount = 0;
+
+  for (const material of materials) {
+    const classUsers = membersByClassroom.get(material.classroomId) ?? [material.uploadedById];
+    const requestedById = faker.helpers.arrayElement(classUsers);
+    const selectedTypes = pickMany(availableJobTypes, 1, COUNTS.aiJobsPerMaterial);
+
+    for (const type of selectedTypes) {
+      const status = faker.helpers.weightedArrayElement<AIJobStatus>([
+        { value: AIJobStatus.succeeded, weight: 6 },
+        { value: AIJobStatus.failed_processing, weight: 1 },
+        { value: AIJobStatus.failed_delivery, weight: 1 },
+        { value: AIJobStatus.processing, weight: 1 },
+        { value: AIJobStatus.accepted, weight: 1 },
+      ]);
+
+      const startedAt = faker.date.recent({ days: 7 });
+      const completedAt =
+        status === AIJobStatus.succeeded ||
+        status === AIJobStatus.failed_processing ||
+        status === AIJobStatus.failed_delivery
+          ? faker.date.between({ from: startedAt, to: new Date() })
+          : null;
+
+      const job = await prisma.aiJob.create({
+        data: {
+          materialId: material.id,
+          requestedById,
+          type,
+          status,
+          attempts: status === AIJobStatus.accepted ? 0 : faker.number.int({ min: 1, max: 3 }),
+          parameters: {
+            mcqCount: 10,
+            essayCount: 5,
+            summaryMaxWords: 200,
+            mcpEnabled: true,
+          },
+          externalJobId:
+            status === AIJobStatus.succeeded ||
+            status === AIJobStatus.failed_processing ||
+            status === AIJobStatus.failed_delivery
+              ? `job-${faker.string.alphanumeric({ length: 24, casing: 'lower' })}`
+              : null,
+          lastError:
+            status === AIJobStatus.failed_processing
+              ? 'Model failed to generate output'
+              : status === AIJobStatus.failed_delivery
+                ? 'Callback delivery failed'
+                : null,
+          startedAt: status === AIJobStatus.accepted ? null : startedAt,
+          completedAt,
+        },
+        select: { id: true, status: true },
+      });
+
+      aiJobIds.push(job.id);
+      const currentStatuses = materialJobStatusMap.get(material.id) ?? [];
+      currentStatuses.push(job.status);
+      materialJobStatusMap.set(material.id, currentStatuses);
+
+      if (status === AIJobStatus.succeeded) {
+        await prisma.aiOutput.create({
+          data: {
+            materialId: material.id,
+            jobId: job.id,
+            type,
+            content: {
+              type,
+              generatedAt: new Date().toISOString(),
+              items:
+                type === AIJobType.SUMMARY
+                  ? faker.lorem.paragraphs(2, '\n\n')
+                  : Array.from({ length: 3 }, (_, idx) => ({
+                      no: idx + 1,
+                      question: faker.lorem.sentence(),
+                      answer: faker.lorem.sentence(),
+                    })),
+            },
+            editedContent: faker.datatype.boolean({ probability: 0.3 })
+              ? {
+                  editorNote: 'Adjusted by teacher before publishing',
+                }
+              : null,
+            isPublished: faker.datatype.boolean({ probability: 0.4 }),
+            publishedAt: faker.datatype.boolean({ probability: 0.4 })
+              ? faker.date.recent({ days: 5 })
+              : null,
+          },
+        });
+        aiOutputsCount += 1;
+      }
+    }
+  }
+
+  for (const material of materials) {
+    const statuses = materialJobStatusMap.get(material.id) ?? [];
+    const materialStatus = statuses.some(
+      (status) => status === AIJobStatus.accepted || status === AIJobStatus.processing,
+    )
+      ? MaterialStatus.PROCESSING
+      : statuses.some((status) => status === AIJobStatus.succeeded)
+        ? MaterialStatus.READY
+        : MaterialStatus.UPLOADED;
+
+    await prisma.material.update({
+      where: { id: material.id },
+      data: { status: materialStatus },
+    });
+  }
+
   const threadIds: string[] = [];
   for (const classroom of classrooms) {
     const classroomUsers = membersByClassroom.get(classroom.id) ?? [classroom.teacherId];
@@ -279,6 +429,9 @@ async function main() {
         blogPosts: blogInputs.length,
         classrooms: classrooms.length,
         classroomMembers: classroomMembers.length,
+        materials: materials.length,
+        aiJobs: aiJobIds.length,
+        aiOutputs: aiOutputsCount,
         forumThreads: threadIds.length,
         forumComments: comments.length,
         forumThreadUpvotes: threadVotes.length,
