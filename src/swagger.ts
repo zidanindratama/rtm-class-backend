@@ -439,6 +439,14 @@ export function configureSwagger(app: INestApplication): void {
       'Queue and monitor asynchronous AI transformations for materials, including provider callbacks.',
     )
     .addTag(
+      'Assignments',
+      'Timeline publishing of assignments/quizzes, student submissions, grading, and class grade recap.',
+    )
+    .addTag(
+      'Analytics',
+      'Class-level learning analytics: completion, pass rate, missing submissions, and hardest questions.',
+    )
+    .addTag(
       'Forums',
       'Classroom discussion threads, nested comments, replies, and upvote interactions.',
     )
@@ -453,6 +461,10 @@ export function configureSwagger(app: INestApplication): void {
     .addTag(
       'Uploads',
       'File upload endpoint backed by Cloudinary for storing assets/materials.',
+    )
+    .addTag(
+      'Moderation (Admin)',
+      'Super-admin moderation endpoints for removing violating classes, materials, forums, assignments, and blog comments.',
     )
     .addTag('System', 'Basic health/welcome endpoint.')
     .addBearerAuth(

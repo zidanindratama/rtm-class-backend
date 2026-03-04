@@ -2,11 +2,14 @@ import { faker } from '@faker-js/faker';
 import {
   AIJobStatus,
   AIJobType,
+  AssignmentStatus,
+  AssignmentType,
   ClassroomMemberRole,
   MaterialStatus,
   OtpPurpose,
   Prisma,
   PrismaClient,
+  SubmissionStatus,
   UserRole,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -26,6 +29,9 @@ const COUNTS = {
   commentsPerThread: 3,
   materialsPerClassroom: 2,
   aiJobsPerMaterial: 2,
+  assignmentsPerClassroom: 3,
+  maxSubmissionsPerAssignment: 20,
+  blogCommentsPerPost: 4,
 };
 
 const PASSWORD_PLAIN = 'Password123!';
@@ -66,6 +72,9 @@ function createUserInputs(
 }
 
 async function clearDatabase() {
+  await prisma.assignmentSubmission.deleteMany();
+  await prisma.assignment.deleteMany();
+  await prisma.blogComment.deleteMany();
   await prisma.aiOutput.deleteMany();
   await prisma.aiJob.deleteMany();
   await prisma.material.deleteMany();
@@ -177,10 +186,17 @@ async function main() {
   await prisma.classroomMember.createMany({ data: classroomMembers });
 
   const membersByClassroom = new Map<string, string[]>();
+  const studentsByClassroom = new Map<string, string[]>();
   for (const member of classroomMembers) {
     const existing = membersByClassroom.get(member.classroomId) ?? [];
     existing.push(member.userId);
     membersByClassroom.set(member.classroomId, existing);
+
+    if (member.role === ClassroomMemberRole.STUDENT) {
+      const existingStudents = studentsByClassroom.get(member.classroomId) ?? [];
+      existingStudents.push(member.userId);
+      studentsByClassroom.set(member.classroomId, existingStudents);
+    }
   }
 
   const materials: {
@@ -389,6 +405,137 @@ async function main() {
   }
   await prisma.forumCommentUpvote.createMany({ data: commentVotes });
 
+  const blogPosts = await prisma.blogPost.findMany({
+    select: { id: true },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const blogComments: { id: string; postId: string }[] = [];
+  for (const post of blogPosts) {
+    for (let i = 0; i < COUNTS.blogCommentsPerPost; i += 1) {
+      const existingInPost = blogComments.filter((comment) => comment.postId === post.id);
+      const parentComment =
+        existingInPost.length > 0 && faker.datatype.boolean({ probability: 0.35 })
+          ? faker.helpers.arrayElement(existingInPost)
+          : null;
+
+      const created = await prisma.blogComment.create({
+        data: {
+          postId: post.id,
+          authorId: faker.helpers.arrayElement(users).id,
+          parentId: parentComment?.id ?? null,
+          content: faker.lorem.sentences({ min: 1, max: 3 }),
+        },
+        select: { id: true, postId: true },
+      });
+
+      blogComments.push(created);
+    }
+  }
+
+  const assignments: { id: string; classroomId: string; maxScore: number }[] = [];
+  for (const classroom of classrooms) {
+    const classMaterials = materials.filter((material) => material.classroomId === classroom.id);
+    for (let i = 0; i < COUNTS.assignmentsPerClassroom; i += 1) {
+      const assignmentType = faker.helpers.arrayElement<AssignmentType>([
+        AssignmentType.QUIZ_MCQ,
+        AssignmentType.QUIZ_ESSAY,
+        AssignmentType.TASK,
+        AssignmentType.REMEDIAL,
+      ]);
+
+      const isPublished = faker.datatype.boolean({ probability: 0.75 });
+      const maxScore = faker.helpers.arrayElement([100, 100, 50]);
+      const assignment = await prisma.assignment.create({
+        data: {
+          classroomId: classroom.id,
+          materialId:
+            classMaterials.length > 0 && faker.datatype.boolean({ probability: 0.7 })
+              ? faker.helpers.arrayElement(classMaterials).id
+              : null,
+          createdById: classroom.teacherId,
+          title: titleCase(`${assignmentType.replace('_', ' ')} ${faker.word.noun()} ${i + 1}`),
+          description: faker.lorem.sentences(2),
+          type: assignmentType,
+          status: isPublished ? AssignmentStatus.PUBLISHED : AssignmentStatus.DRAFT,
+          content:
+            assignmentType === AssignmentType.QUIZ_MCQ
+              ? {
+                  questions: Array.from({ length: 5 }, (_, qIdx) => ({
+                    id: `q${qIdx + 1}`,
+                    text: faker.lorem.sentence(),
+                    options: ['A', 'B', 'C', 'D'],
+                    correctAnswer: faker.helpers.arrayElement(['A', 'B', 'C', 'D']),
+                  })),
+                }
+              : assignmentType === AssignmentType.QUIZ_ESSAY
+                ? {
+                    questions: Array.from({ length: 3 }, (_, qIdx) => ({
+                      id: `q${qIdx + 1}`,
+                      text: faker.lorem.sentence(),
+                      rubric: 'Explain with clear reasoning',
+                    })),
+                  }
+                : {
+                    instructions: faker.lorem.paragraphs(2, '\n\n'),
+                  },
+          passingScore: 70,
+          maxScore,
+          dueAt: isPublished ? faker.date.soon({ days: 14 }) : null,
+          publishedAt: isPublished ? faker.date.recent({ days: 7 }) : null,
+        },
+        select: { id: true, classroomId: true, maxScore: true },
+      });
+
+      assignments.push(assignment);
+    }
+  }
+
+  let assignmentSubmissionsCount = 0;
+  let gradedSubmissionsCount = 0;
+  for (const assignment of assignments) {
+    const classStudents = studentsByClassroom.get(assignment.classroomId) ?? [];
+    const submitters = pickMany(
+      classStudents,
+      Math.min(3, classStudents.length),
+      Math.min(COUNTS.maxSubmissionsPerAssignment, classStudents.length),
+    );
+
+    for (const studentId of submitters) {
+      const graded = faker.datatype.boolean({ probability: 0.65 });
+      const score = graded
+        ? faker.number.int({ min: 30, max: assignment.maxScore })
+        : null;
+      const submittedAt = faker.date.recent({ days: 10 });
+      const gradedAt =
+        graded && faker.datatype.boolean({ probability: 0.95 })
+          ? faker.date.between({ from: submittedAt, to: new Date() })
+          : null;
+
+      await prisma.assignmentSubmission.create({
+        data: {
+          assignmentId: assignment.id,
+          studentId,
+          answers: {
+            responses: [
+              { questionId: 'q1', answer: faker.helpers.arrayElement(['A', 'B', 'C', 'D']) },
+              { questionId: 'q2', answer: faker.helpers.arrayElement(['A', 'B', 'C', 'D']) },
+            ],
+          },
+          status: graded ? SubmissionStatus.GRADED : SubmissionStatus.SUBMITTED,
+          score,
+          feedback: graded ? faker.lorem.sentence() : null,
+          gradedById: graded ? classrooms.find((classroom) => classroom.id === assignment.classroomId)?.teacherId ?? null : null,
+          submittedAt,
+          gradedAt,
+        },
+      });
+
+      assignmentSubmissionsCount += 1;
+      if (graded) gradedSubmissionsCount += 1;
+    }
+  }
+
   await prisma.otp.createMany({
     data: Array.from({ length: COUNTS.otpCodes }, () => {
       const user = faker.helpers.arrayElement(users);
@@ -436,6 +583,10 @@ async function main() {
         forumComments: comments.length,
         forumThreadUpvotes: threadVotes.length,
         forumCommentUpvotes: commentVotes.length,
+        blogComments: blogComments.length,
+        assignments: assignments.length,
+        assignmentSubmissions: assignmentSubmissionsCount,
+        gradedSubmissions: gradedSubmissionsCount,
         otpCodes: COUNTS.otpCodes,
         refreshTokens: COUNTS.refreshTokens,
         defaultPassword: PASSWORD_PLAIN,

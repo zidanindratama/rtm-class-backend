@@ -1,7 +1,10 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiHeader, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { JwtPayload } from '../auth/types';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { queryBlogsSchema } from './blogs.schemas';
+import { createBlogCommentSchema, queryBlogCommentsSchema, queryBlogsSchema } from './blogs.schemas';
 import { BlogsService } from './blogs.service';
 
 @Controller({ path: 'blogs', version: '1' })
@@ -34,5 +37,64 @@ export class BlogsPublicController {
   @ApiOperation({ summary: 'Get published blog by slug' })
   getBySlug(@Param('slug') slug: string) {
     return this.blogsService.getPublishedPostBySlug(slug);
+  }
+
+  @Get(':slug/comments')
+  @ApiOperation({ summary: 'List comments for published blog' })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'per_page', required: false, example: 10 })
+  @ApiQuery({ name: 'sort_order', required: false, enum: ['asc', 'desc'] })
+  listComments(
+    @Param('slug') slug: string,
+    @Query(new ZodValidationPipe(queryBlogCommentsSchema)) query: unknown,
+  ) {
+    return this.blogsService.listCommentsBySlug(slug, query as any);
+  }
+
+  @Post(':slug/comments')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Create comment on published blog' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['content'],
+      properties: {
+        content: { type: 'string', example: 'Great article, very helpful.' },
+      },
+    },
+  })
+  createComment(
+    @CurrentUser() user: JwtPayload,
+    @Param('slug') slug: string,
+    @Body(new ZodValidationPipe(createBlogCommentSchema)) body: unknown,
+  ) {
+    return this.blogsService.createComment(user, slug, body as any, null);
+  }
+
+  @Post('comments/:commentId/replies')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Reply to blog comment' })
+  @ApiParam({
+    name: 'commentId',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['content'],
+      properties: {
+        content: { type: 'string', example: 'I agree with this point.' },
+      },
+    },
+  })
+  replyComment(
+    @CurrentUser() user: JwtPayload,
+    @Param('commentId', new ParseUUIDPipe({ version: '4' })) commentId: string,
+    @Body(new ZodValidationPipe(createBlogCommentSchema)) body: unknown,
+  ) {
+    return this.blogsService.replyToComment(user, commentId, body as any);
   }
 }

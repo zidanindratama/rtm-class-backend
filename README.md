@@ -28,6 +28,12 @@ NestJS backend API for RTM Class platform: authentication, user/class management
 - API base: `http://localhost:5000/api/v1`
 - Swagger UI: `http://localhost:5000/docs`
 - OpenAPI JSON: `http://localhost:5000/docs-json`
+- Postman Published Docs: `https://documenter.getpostman.com/view/14021625/2sBXcKCJeu`
+
+## API Documentation Channels
+- Swagger (interactive): best for quick endpoint trial from local environment.
+- Postman Published Docs: best for frontend contract review with structured endpoint descriptions, payload examples, success responses, and error matrix.
+- Postman Collection JSON: available in `docs-postman/RTM Class.postman_collection.json` for import and team workspace usage.
 
 ## Swagger Quick Start (Click-Only)
 Swagger is configured for interactive usage like Postman:
@@ -66,6 +72,8 @@ copy .env.local.example .env.local
 - `DATABASE_URL`
 - `REDIS_URL`
 - Mail credentials (`EMAIL_USER`, `EMAIL_APP_PASSWORD`) if testing OTP email
+  - For Docker/dev networks, prefer SMTP mode: `EMAIL_PROVIDER=smtp`, `EMAIL_HOST=smtp.gmail.com`, `EMAIL_PORT=587`, `EMAIL_SECURE=false`, `EMAIL_REQUIRE_TLS=true`
+  - To prevent `forgot-password` from failing when SMTP is unreachable, set `EMAIL_STRICT_MODE=false` (default) or fully bypass send with `EMAIL_DISABLE_SEND=true`
 - Cloudinary credentials for upload endpoint
 - AI integration variables if testing AI endpoints/callbacks
 

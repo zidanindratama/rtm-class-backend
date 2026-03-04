@@ -121,4 +121,18 @@ export class BlogsAdminController {
   deletePost(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.blogsService.deletePost(id);
   }
+
+  @Delete('comments/:id')
+  @ApiOperation({ summary: 'Delete blog comment (admin)' })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  deleteComment(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
+    return this.blogsService.deleteCommentByAdmin(user, id);
+  }
 }

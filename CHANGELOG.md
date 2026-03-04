@@ -3,47 +3,99 @@
 All notable changes to this project are documented in this file.
 
 This changelog combines:
-- committed history from Git (`b2dcb9e` to `0bd8f60`)
-- latest local work that is not committed yet (`Unreleased`)
+- committed history from Git
+- latest local work in the current working tree
 
-## [Unreleased] - 2026-03-04
-Latest local updates in the working tree (not committed yet).
+## [2026-03-04] - Local Working Tree (Not Yet Committed)
+### Added
+- New domain modules:
+  - `assignments` (timeline/list/detail/create/publish/submit/list submissions/grade/gradebook/delete)
+  - `analytics` (class dashboard metrics endpoint)
+  - `admin-moderation` (admin delete/moderation endpoints across content)
+- Blog comments support:
+  - public list/create/reply
+  - admin delete comment
+- Prisma schema expansion:
+  - added `Assignment`
+  - added `AssignmentSubmission`
+  - added `BlogComment`
+  - added related enums and relation mappings
+- New Prisma migration:
+  - `20260304190000_add_assignments_blog_comments`
+- Seed data expansion:
+  - seeded assignments, submissions, grading states, and blog comments
+  - seeded gradebook-related score data for assignment analytics/recap
+- Postman environment and collection variables for new modules:
+  - `ASSIGNMENT_ID`, `SUBMISSION_ID`, `BLOG_COMMENT_ID`, `BLOG_SLUG`
 
-Planned commit scope: `materials` + `ai-jobs` feature delivery, Prisma migrations, Swagger documentation expansion, and README/CHANGELOG refresh.
+### Changed
+- App module wiring and Swagger tags updated to register new modules and routes.
+- Postman collection documentation upgraded to ultra-strict endpoint contracts:
+  - access/header/path/query/body contracts
+  - frontend payload checklist
+  - URL/body examples
+  - domain-specific success response examples
+  - endpoint error matrix
+- README updated with mail behavior guidance and published Postman docs link:
+  - `https://documenter.getpostman.com/view/14021625/2sBXcKCJeu`
+- Mail service hardening for dev stability:
+  - SMTP transport made configurable through env
+  - non-strict mode logs mail failure without breaking forgot-password flow
+  - added toggles like `EMAIL_STRICT_MODE` and `EMAIL_DISABLE_SEND`
+  - updated OTP email subject to English (`RTM Class Password Reset OTP`)
+- Environment documentation updates:
+  - `.env.example` now includes detailed mail config keys:
+    - `EMAIL_FROM`
+    - `EMAIL_PROVIDER`
+    - `EMAIL_HOST`
+    - `EMAIL_PORT`
+    - `EMAIL_SECURE`
+    - `EMAIL_REQUIRE_TLS`
+    - `EMAIL_TLS_REJECT_UNAUTHORIZED`
+    - `EMAIL_STRICT_MODE`
+    - `EMAIL_DISABLE_SEND`
+  - `.env.local.example` includes local-safe mail defaults and send bypass guidance
+- Grading and score recap are now explicitly documented in API changes:
+  - submission grading endpoint behavior
+  - class gradebook recap endpoint
+  - analytics linkage with graded submissions
+
+### Technical Notes
+- Build validated successfully after module and mail updates (`npm run build`).
+- Existing response envelope convention remains intact (`message`, `data`, `meta`, `error`).
+- All new resource identifiers and route params remain UUID-based.
+
+## [4150183] - 2026-03-04
+`upd: changelog`
+
+### Changed
+- Updated changelog structure and content quality for clearer release tracking.
+- Improved detail level for recent backend updates and documentation updates.
+
+## [37031fc] - 2026-03-04
+`feat: add materials and ai-jobs modules with Swagger/docs updates`
 
 ### Added
-- New `materials` module:
-  - material listing with access-aware filtering
-  - material detail by UUID
-  - material creation endpoint (metadata + file URL)
-  - AI output listing per material
-- New `ai-jobs` module:
-  - enqueue AI transform jobs for a material
-  - query AI job status/detail by UUID
-  - provider callback endpoint for asynchronous job result updates
-- New Prisma migrations:
+- `materials` module:
+  - list materials with access-aware filtering
+  - get material detail by UUID
+  - create material (metadata + file URL)
+  - retrieve AI outputs by material
+- `ai-jobs` module:
+  - queue AI transform jobs by material
+  - inspect AI job detail/status by UUID
+  - async callback endpoint for provider result updates
+- Prisma migrations:
   - `20260304090000_add_materials_ai_jobs`
   - `20260304163000_sync_ai_status_enum`
-- New seed coverage for newly introduced domain objects:
+- Seed coverage for:
   - materials
   - AI jobs
   - AI outputs
 
 ### Changed
-- Swagger documentation was expanded for click-first usage:
-  - richer global description with testing quick-start
-  - clearer tag descriptions across all API domains
-  - improved operation defaults and examples for common query/path parameters
-  - improved UI defaults (`try it out`, operation sorting, tag sorting, expansion behavior)
-- Auth request examples were aligned with seeded accounts for immediate testing.
-- README was reworked with complete setup, run modes, Swagger usage flow, and module overview.
-- Environment examples and package dependencies were updated to support new modules and integrations.
-- Application wiring was updated to register newly added modules in NestJS app composition.
-
-### Technical Notes
-- Build validated successfully after documentation and Swagger changes (`npm run build`).
-- Existing response envelope convention remains intact (`message`, `data`, `meta`, `error`).
-- All new resource identifiers and route params remain UUID-based.
+- Expanded Swagger docs for click-first testing and clearer endpoint contracts.
+- Updated README and API examples for improved onboarding.
 
 ## [0bd8f60] - 2026-03-04
 `fix: auto-init dev database after docker up`

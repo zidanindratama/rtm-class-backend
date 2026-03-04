@@ -46,6 +46,24 @@ enum AIJobStatus {
   failed_delivery
 }
 
+enum AssignmentType {
+  QUIZ_MCQ
+  QUIZ_ESSAY
+  TASK
+  REMEDIAL
+}
+
+enum AssignmentStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  GRADED
+}
+
 model User {
   id            String         @id @default(uuid())
   fullName      String
@@ -67,6 +85,10 @@ model User {
   commentVotes  ForumCommentUpvote[]
   uploadedMaterials Material[]
   aiJobsRequested   AiJob[]
+  assignmentsCreated Assignment[]          @relation("AssignmentCreator")
+  submissions        AssignmentSubmission[] @relation("SubmissionStudent")
+  gradedSubmissions  AssignmentSubmission[] @relation("SubmissionGrader")
+  blogComments       BlogComment[]
 }
 
 model Profile {
@@ -92,8 +114,27 @@ model BlogPost {
   updatedAt   DateTime @updatedAt
   authorId    String
   author      User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  comments    BlogComment[]
 
   @@index([isPublished, publishedAt])
+}
+
+model BlogComment {
+  id        String        @id @default(uuid())
+  postId    String
+  authorId  String
+  parentId  String?
+  content   String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  post      BlogPost      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent    BlogComment?  @relation("BlogCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   BlogComment[] @relation("BlogCommentReplies")
+
+  @@index([postId, createdAt])
+  @@index([authorId])
+  @@index([parentId])
 }
 
 model Otp {
@@ -136,9 +177,36 @@ model Classroom {
   members         ClassroomMember[]
   forumThreads    ForumThread[]
   materials       Material[]
+  assignments     Assignment[]
 
   @@index([teacherId])
   @@index([createdAt])
+}
+
+model Assignment {
+  id           String               @id @default(uuid())
+  classroomId  String
+  materialId   String?
+  createdById  String
+  title        String
+  description  String?
+  type         AssignmentType
+  status       AssignmentStatus     @default(DRAFT)
+  content      Json?
+  passingScore Int                  @default(70)
+  maxScore     Int                  @default(100)
+  dueAt        DateTime?
+  publishedAt  DateTime?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  classroom    Classroom            @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  material     Material?            @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  createdBy    User                 @relation("AssignmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  submissions  AssignmentSubmission[]
+
+  @@index([classroomId, status, createdAt])
+  @@index([createdById])
+  @@index([materialId])
 }
 
 model Material {
@@ -156,6 +224,7 @@ model Material {
   uploadedBy    User         @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
   aiJobs        AiJob[]
   aiOutputs     AiOutput[]
+  assignments   Assignment[]
 
   @@index([classroomId, createdAt])
   @@index([uploadedById])
@@ -214,6 +283,28 @@ model ClassroomMember {
 
   @@unique([classroomId, userId])
   @@index([userId])
+}
+
+model AssignmentSubmission {
+  id          String           @id @default(uuid())
+  assignmentId String
+  studentId    String
+  answers      Json?
+  status       SubmissionStatus @default(SUBMITTED)
+  score        Float?
+  feedback     String?
+  gradedById   String?
+  submittedAt  DateTime         @default(now())
+  gradedAt     DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  assignment   Assignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student      User             @relation("SubmissionStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  gradedBy     User?            @relation("SubmissionGrader", fields: [gradedById], references: [id], onDelete: SetNull)
+
+  @@unique([assignmentId, studentId])
+  @@index([studentId, submittedAt])
+  @@index([assignmentId, status])
 }
 
 model ForumThread {

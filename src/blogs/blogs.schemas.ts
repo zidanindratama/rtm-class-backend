@@ -23,6 +23,16 @@ export const createBlogSchema = z.object({
 
 export const updateBlogSchema = createBlogSchema.partial();
 
+export const queryBlogCommentsSchema = paginationQuerySchema.extend({
+  sort_by: z.enum(['createdAt']).default('createdAt'),
+});
+
+export const createBlogCommentSchema = z.object({
+  content: z.string().trim().min(1).max(2000),
+});
+
 export type QueryBlogsInput = z.infer<typeof queryBlogsSchema>;
 export type CreateBlogInput = z.infer<typeof createBlogSchema>;
 export type UpdateBlogInput = z.infer<typeof updateBlogSchema>;
+export type QueryBlogCommentsInput = z.infer<typeof queryBlogCommentsSchema>;
+export type CreateBlogCommentInput = z.infer<typeof createBlogCommentSchema>;
