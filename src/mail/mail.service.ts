@@ -27,7 +27,9 @@ export class MailService {
     }
 
     if (!user || !pass) {
-      this.logger.warn('EMAIL_USER or EMAIL_APP_PASSWORD is not set. Skip sending email.');
+      this.logger.warn(
+        'EMAIL_USER or EMAIL_APP_PASSWORD is not set. Skip sending email.',
+      );
       return;
     }
 
@@ -54,7 +56,8 @@ export class MailService {
         html,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown mail error';
+      const message =
+        error instanceof Error ? error.message : 'Unknown mail error';
 
       if (strictMode) {
         throw error;
@@ -92,7 +95,10 @@ export class MailService {
     });
   }
 
-  private asBoolean(rawValue: string | undefined, defaultValue: boolean): boolean {
+  private asBoolean(
+    rawValue: string | undefined,
+    defaultValue: boolean,
+  ): boolean {
     if (!rawValue) {
       return defaultValue;
     }

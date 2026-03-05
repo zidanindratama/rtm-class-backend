@@ -24,7 +24,9 @@ export class ForumsService {
       OR: query.search
         ? [
             { title: { contains: query.search, mode: 'insensitive' as const } },
-            { content: { contains: query.search, mode: 'insensitive' as const } },
+            {
+              content: { contains: query.search, mode: 'insensitive' as const },
+            },
           ]
         : undefined,
     };
@@ -191,7 +193,11 @@ export class ForumsService {
     };
   }
 
-  async replyToComment(user: JwtPayload, commentId: string, input: CreateForumCommentInput) {
+  async replyToComment(
+    user: JwtPayload,
+    commentId: string,
+    input: CreateForumCommentInput,
+  ) {
     const parentComment = await this.prisma.forumComment.findUnique({
       where: { id: commentId },
       select: { id: true, threadId: true },
@@ -201,7 +207,12 @@ export class ForumsService {
       throw new NotFoundException('Comment not found');
     }
 
-    return this.createComment(user, parentComment.threadId, parentComment.id, input);
+    return this.createComment(
+      user,
+      parentComment.threadId,
+      parentComment.id,
+      input,
+    );
   }
 
   async toggleThreadUpvote(user: JwtPayload, threadId: string) {
@@ -222,7 +233,9 @@ export class ForumsService {
     });
 
     if (existing) {
-      await this.prisma.forumThreadUpvote.delete({ where: { id: existing.id } });
+      await this.prisma.forumThreadUpvote.delete({
+        where: { id: existing.id },
+      });
       return { message: 'Thread upvote removed', data: { upvoted: false } };
     }
 
@@ -243,7 +256,10 @@ export class ForumsService {
       throw new NotFoundException('Comment not found');
     }
 
-    await this.classesService.assertClassAccess(user, comment.thread.classroomId);
+    await this.classesService.assertClassAccess(
+      user,
+      comment.thread.classroomId,
+    );
 
     const existing = await this.prisma.forumCommentUpvote.findUnique({
       where: { commentId_userId: { commentId, userId: user.sub } },
@@ -251,7 +267,9 @@ export class ForumsService {
     });
 
     if (existing) {
-      await this.prisma.forumCommentUpvote.delete({ where: { id: existing.id } });
+      await this.prisma.forumCommentUpvote.delete({
+        where: { id: existing.id },
+      });
       return { message: 'Comment upvote removed', data: { upvoted: false } };
     }
 

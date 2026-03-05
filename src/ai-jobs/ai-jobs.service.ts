@@ -2,7 +2,6 @@ import {
   AIJobStatus,
   AIJobType,
   MaterialStatus,
-  Prisma,
   UserRole,
 } from '@prisma/client';
 import { HttpService } from '@nestjs/axios';
@@ -20,7 +19,7 @@ import { JwtPayload } from '../auth/types';
 import { ClassesService } from '../classes/classes.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
-import { AiCallbackInput, EnqueueAiTransformInput } from './ai-jobs.schemas';
+import { EnqueueAiTransformInput } from './ai-jobs.schemas';
 
 const WORKER_INTERVAL_MS = 5000;
 const OAUTH_CACHE_KEY = 'rtm:ai:oauth_token';
@@ -129,103 +128,19 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  async handleCallback(jobId: string, payload: AiCallbackInput) {
+  async acknowledgeCallback(jobId: string) {
     const job = await this.prisma.aiJob.findUnique({
       where: { id: jobId },
-      select: { id: true, status: true, materialId: true, type: true },
+      select: { id: true },
     });
 
     if (!job) {
       throw new NotFoundException('AI job not found');
     }
 
-    if (this.isTerminalStatus(job.status)) {
-      await this.forwardCallbackMirror(jobId, payload);
-      return {
-        message: 'AI callback acknowledged (idempotent)',
-        data: { jobId: job.id, status: job.status },
-      };
-    }
-
-    if (
-      payload.status === AIJobStatus.succeeded ||
-      (payload.success && !payload.status)
-    ) {
-      await this.prisma.$transaction([
-        this.prisma.aiJob.update({
-          where: { id: job.id },
-          data: {
-            status: AIJobStatus.succeeded,
-            completedAt: new Date(),
-            externalJobId: payload.externalJobId,
-          },
-        }),
-        this.prisma.aiOutput.upsert({
-          where: { jobId: job.id },
-          create: {
-            jobId: job.id,
-            materialId: job.materialId,
-            type: job.type,
-            content: this.toInputJsonValue(payload.result),
-          },
-          update: {
-            content: this.toInputJsonValue(payload.result),
-          },
-        }),
-      ]);
-
-      await this.refreshMaterialStatus(job.materialId);
-      await this.forwardCallbackMirror(job.id, payload);
-
-      return {
-        message: 'AI callback processed',
-        data: { jobId: job.id, status: AIJobStatus.succeeded },
-      };
-    }
-
-    if (
-      payload.status === AIJobStatus.failed_delivery ||
-      payload.status === AIJobStatus.failed_processing ||
-      payload.success === false
-    ) {
-      const failedStatus =
-        payload.status === AIJobStatus.failed_delivery
-          ? AIJobStatus.failed_delivery
-          : AIJobStatus.failed_processing;
-
-      await this.prisma.aiJob.update({
-        where: { id: job.id },
-        data: {
-          status: failedStatus,
-          completedAt: new Date(),
-          lastError: this.buildCallbackFailureMessage(payload),
-          externalJobId: payload.externalJobId,
-        },
-      });
-
-      await this.refreshMaterialStatus(job.materialId);
-      await this.forwardCallbackMirror(job.id, payload);
-
-      return {
-        message: 'AI callback processed (failed)',
-        data: { jobId: job.id, status: failedStatus },
-      };
-    }
-
-    await this.prisma.aiJob.update({
-      where: { id: job.id },
-      data: {
-        status: AIJobStatus.processing,
-        externalJobId: payload.externalJobId,
-      },
-    });
-
-    await this.refreshMaterialStatus(job.materialId);
-    await this.forwardCallbackMirror(job.id, payload);
-
     return {
-      message: 'AI callback processed (processing)',
-      data: { jobId: job.id, status: AIJobStatus.processing },
+      message: 'AI callback acknowledged (no-op)',
+      data: { jobId: job.id },
     };
   }
 
@@ -286,13 +201,13 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
     type: AIJobType;
     parameters: unknown;
     materialId: string;
+    requestedById: string;
     material: { fileUrl: string; fileMimeType: string | null };
   }) {
     try {
       const endpointPath = this.endpointPathFromJobType(job.type);
       const accessToken = await this.getOAuthAccessToken();
       const baseUrl = this.requireEnv('AI_BASE_URL');
-      const callbackBase = this.requireEnv('AI_CALLBACK_BASE_URL');
 
       const materialFileResponse = await firstValueFrom(
         this.httpService.get<ArrayBuffer>(job.material.fileUrl, {
@@ -310,17 +225,15 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
 
       const parameters = (job.parameters ?? {}) as Record<string, unknown>;
       const form = new FormData();
-      const callbackSecret = process.env.AI_CALLBACK_SECRET?.trim();
-      const callbackUrl = callbackSecret
-        ? `${callbackBase}/api/v1/ai/jobs/${job.id}/callback?callback_secret=${encodeURIComponent(callbackSecret)}`
-        : `${callbackBase}/api/v1/ai/jobs/${job.id}/callback`;
       const uploadFilename = this.buildMaterialFilename(
         job.materialId,
         job.material.fileUrl,
         job.material.fileMimeType,
       );
+      form.set('job_id', job.id);
+      form.set('material_id', job.materialId);
+      form.set('requested_by_id', job.requestedById);
       form.set('user_id', `material:${job.materialId}`);
-      form.set('callback_url', callbackUrl);
       form.set('file', blob, uploadFilename);
 
       this.applyParametersByType(form, job.type, parameters);
@@ -343,40 +256,15 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
         throw new Error(`AI request failed: ${errorText}`);
       }
 
-      const normalized = this.normalizeAiResponse(responsePayload);
-      if (response.status === 202) {
+      const normalized = this.normalizeAiDispatchResponse(responsePayload);
+      if (normalized.externalJobId) {
         await this.prisma.aiJob.update({
           where: { id: job.id },
           data: {
-            status: AIJobStatus.processing,
             externalJobId: normalized.externalJobId,
           },
         });
-        return;
       }
-
-      await this.prisma.$transaction([
-        this.prisma.aiJob.update({
-          where: { id: job.id },
-          data: {
-            status: AIJobStatus.succeeded,
-            completedAt: new Date(),
-            externalJobId: normalized.externalJobId,
-          },
-        }),
-        this.prisma.aiOutput.upsert({
-          where: { jobId: job.id },
-          create: {
-            jobId: job.id,
-            materialId: job.materialId,
-            type: job.type,
-            content: this.toInputJsonValue(normalized.result),
-          },
-          update: {
-            content: this.toInputJsonValue(normalized.result),
-          },
-        }),
-      ]);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unknown AI dispatch error';
@@ -582,12 +470,11 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private normalizeAiResponse(payload: unknown): {
+  private normalizeAiDispatchResponse(payload: unknown): {
     externalJobId?: string;
-    result: unknown;
   } {
     if (typeof payload !== 'object' || payload === null) {
-      return { result: payload };
+      return {};
     }
 
     const obj = payload as Record<string, unknown>;
@@ -599,15 +486,7 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
           : typeof obj.id === 'string'
             ? obj.id
             : undefined;
-
-    const result =
-      obj.data !== undefined
-        ? obj.data
-        : obj.result !== undefined
-          ? obj.result
-          : obj;
-
-    return { externalJobId, result };
+    return { externalJobId };
   }
 
   private requireEnv(key: string): string {
@@ -642,54 +521,6 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
     return fallback;
   }
 
-  private toInputJsonValue(value: unknown): Prisma.InputJsonValue {
-    if (value === null || value === undefined) return {};
-    if (typeof value === 'string') return value;
-    if (typeof value === 'number') return value;
-    if (typeof value === 'boolean') return value;
-    if (Array.isArray(value)) return value as Prisma.InputJsonValue;
-    if (typeof value === 'object') return value as Prisma.InputJsonValue;
-    return String(value);
-  }
-
-  private async forwardCallbackMirror(
-    jobId: string,
-    payload: AiCallbackInput,
-  ): Promise<void> {
-    const mirrorUrl = process.env.AI_CALLBACK_FORWARD_URL?.trim();
-    if (!mirrorUrl) return;
-
-    try {
-      await firstValueFrom(
-        this.httpService.post(
-          mirrorUrl,
-          {
-            jobId,
-            forwardedAt: new Date().toISOString(),
-            payload,
-          },
-          {
-            headers: {
-              'x-source': 'rtm-class-backend',
-            },
-          },
-        ),
-      );
-    } catch (error) {
-      this.logger.warn(
-        `Failed to mirror callback to ${mirrorUrl}: ${error instanceof Error ? error.message : 'unknown error'}`,
-      );
-    }
-  }
-
-  private isTerminalStatus(status: AIJobStatus): boolean {
-    return (
-      status === AIJobStatus.succeeded ||
-      status === AIJobStatus.failed_processing ||
-      status === AIJobStatus.failed_delivery
-    );
-  }
-
   private isSuccessStatus(status: number): boolean {
     return status >= 200 && status < 300;
   }
@@ -703,35 +534,5 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
     } catch {
       return String(payload);
     }
-  }
-
-  private buildCallbackFailureMessage(payload: AiCallbackInput): string {
-    if (payload.error?.message?.trim()) {
-      const code = payload.error.code?.trim();
-      return code
-        ? `AI callback failure [${code}]: ${payload.error.message.trim()}`
-        : `AI callback failure: ${payload.error.message.trim()}`;
-    }
-
-    if (payload.errorMessage?.trim()) return payload.errorMessage.trim();
-
-    const result = payload.result;
-    if (result && typeof result === 'object') {
-      try {
-        const serialized = JSON.stringify(result);
-        if (serialized.length > 1000) {
-          return `AI callback failure details: ${serialized.slice(0, 1000)}...`;
-        }
-        return `AI callback failure details: ${serialized}`;
-      } catch {
-        return 'AI callback indicated failure';
-      }
-    }
-
-    if (typeof result === 'string' && result.trim().length > 0) {
-      return `AI callback failure details: ${result.trim()}`;
-    }
-
-    return 'AI callback indicated failure';
   }
 }

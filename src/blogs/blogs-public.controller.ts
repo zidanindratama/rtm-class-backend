@@ -1,10 +1,31 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiHeader, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiHeader,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { JwtPayload } from '../auth/types';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { createBlogCommentSchema, queryBlogCommentsSchema, queryBlogsSchema } from './blogs.schemas';
+import {
+  createBlogCommentSchema,
+  queryBlogCommentsSchema,
+  queryBlogsSchema,
+} from './blogs.schemas';
 import { BlogsService } from './blogs.service';
 
 @Controller({ path: 'blogs', version: '1' })
@@ -29,7 +50,9 @@ export class BlogsPublicController {
     enum: ['createdAt', 'publishedAt', 'title'],
   })
   @ApiQuery({ name: 'sort_order', required: false, enum: ['asc', 'desc'] })
-  listPublished(@Query(new ZodValidationPipe(queryBlogsSchema)) query: unknown) {
+  listPublished(
+    @Query(new ZodValidationPipe(queryBlogsSchema)) query: unknown,
+  ) {
     return this.blogsService.listPublishedPosts(query as any);
   }
 

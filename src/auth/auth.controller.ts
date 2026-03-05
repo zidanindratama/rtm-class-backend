@@ -52,7 +52,11 @@ export class AuthController {
       required: ['fullName', 'email', 'password', 'role'],
       properties: {
         fullName: { type: 'string', example: 'Zidan Indratama' },
-        email: { type: 'string', format: 'email', example: 'zidan@example.com' },
+        email: {
+          type: 'string',
+          format: 'email',
+          example: 'zidan@example.com',
+        },
         password: { type: 'string', minLength: 8, example: 'P@ssw0rd123' },
         role: {
           type: 'string',
@@ -73,7 +77,11 @@ export class AuthController {
       type: 'object',
       required: ['email', 'password'],
       properties: {
-        email: { type: 'string', format: 'email', example: 'admin.1@rtmclass.test' },
+        email: {
+          type: 'string',
+          format: 'email',
+          example: 'admin.1@rtmclass.test',
+        },
         password: { type: 'string', example: 'Password123!' },
       },
     },
@@ -89,7 +97,11 @@ export class AuthController {
       type: 'object',
       required: ['email', 'password'],
       properties: {
-        email: { type: 'string', format: 'email', example: 'admin.1@rtmclass.test' },
+        email: {
+          type: 'string',
+          format: 'email',
+          example: 'admin.1@rtmclass.test',
+        },
         password: { type: 'string', example: 'Password123!' },
       },
     },
@@ -105,7 +117,11 @@ export class AuthController {
       type: 'object',
       required: ['email', 'password'],
       properties: {
-        email: { type: 'string', format: 'email', example: 'teacher.1@rtmclass.test' },
+        email: {
+          type: 'string',
+          format: 'email',
+          example: 'teacher.1@rtmclass.test',
+        },
         password: { type: 'string', example: 'Password123!' },
       },
     },
@@ -138,7 +154,8 @@ export class AuthController {
   @ApiHeader({
     name: 'authorization',
     required: false,
-    description: 'Optional Bearer refresh token. Alternative: send refreshToken in body.',
+    description:
+      'Optional Bearer refresh token. Alternative: send refreshToken in body.',
   })
   @ApiBody({
     required: false,
@@ -153,10 +170,9 @@ export class AuthController {
     @Headers('authorization') authorization?: string,
     @Body() body?: { refreshToken?: string },
   ) {
-    const bearerToken =
-      authorization?.startsWith('Bearer ')
-        ? authorization.slice('Bearer '.length).trim()
-        : undefined;
+    const bearerToken = authorization?.startsWith('Bearer ')
+      ? authorization.slice('Bearer '.length).trim()
+      : undefined;
 
     const refreshToken = bearerToken || body?.refreshToken;
     if (!refreshToken) {
@@ -175,11 +191,17 @@ export class AuthController {
       type: 'object',
       required: ['email'],
       properties: {
-        email: { type: 'string', format: 'email', example: 'zidan@example.com' },
+        email: {
+          type: 'string',
+          format: 'email',
+          example: 'zidan@example.com',
+        },
       },
     },
   })
-  forgotPassword(@Body(new ZodValidationPipe(forgotPasswordSchema)) dto: unknown) {
+  forgotPassword(
+    @Body(new ZodValidationPipe(forgotPasswordSchema)) dto: unknown,
+  ) {
     return this.authService.forgotPassword(dto as any);
   }
 
@@ -190,13 +212,28 @@ export class AuthController {
       type: 'object',
       required: ['email', 'otpCode', 'newPassword'],
       properties: {
-        email: { type: 'string', format: 'email', example: 'zidan@example.com' },
-        otpCode: { type: 'string', minLength: 6, maxLength: 6, example: '123456' },
-        newPassword: { type: 'string', minLength: 8, example: 'NewP@ssw0rd123' },
+        email: {
+          type: 'string',
+          format: 'email',
+          example: 'zidan@example.com',
+        },
+        otpCode: {
+          type: 'string',
+          minLength: 6,
+          maxLength: 6,
+          example: '123456',
+        },
+        newPassword: {
+          type: 'string',
+          minLength: 8,
+          example: 'NewP@ssw0rd123',
+        },
       },
     },
   })
-  resetPassword(@Body(new ZodValidationPipe(resetPasswordSchema)) dto: unknown) {
+  resetPassword(
+    @Body(new ZodValidationPipe(resetPasswordSchema)) dto: unknown,
+  ) {
     return this.authService.resetPassword(dto as any);
   }
 
@@ -210,7 +247,11 @@ export class AuthController {
       required: ['currentPassword', 'newPassword'],
       properties: {
         currentPassword: { type: 'string', example: 'OldP@ssw0rd123' },
-        newPassword: { type: 'string', minLength: 8, example: 'NewP@ssw0rd123' },
+        newPassword: {
+          type: 'string',
+          minLength: 8,
+          example: 'NewP@ssw0rd123',
+        },
       },
     },
   })

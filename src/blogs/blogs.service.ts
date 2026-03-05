@@ -125,7 +125,9 @@ export class BlogsService {
   }
 
   async createPost(adminId: string, dto: CreateBlogInput) {
-    const slug = await this.ensureUniqueSlug(dto.slug ?? this.slugify(dto.title));
+    const slug = await this.ensureUniqueSlug(
+      dto.slug ?? this.slugify(dto.title),
+    );
 
     const post = await this.prisma.blogPost.create({
       data: {
@@ -177,7 +179,7 @@ export class BlogsService {
         excerpt: dto.excerpt,
         content: dto.content,
         isPublished,
-        publishedAt: isPublished ? existing.publishedAt ?? new Date() : null,
+        publishedAt: isPublished ? (existing.publishedAt ?? new Date()) : null,
       },
       include: {
         author: {
@@ -289,7 +291,9 @@ export class BlogsService {
       });
 
       if (!parent || parent.postId !== post.id) {
-        throw new NotFoundException('Parent blog comment not found in this post');
+        throw new NotFoundException(
+          'Parent blog comment not found in this post',
+        );
       }
     }
 

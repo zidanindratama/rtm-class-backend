@@ -6,13 +6,19 @@ export class AdminModerationService {
   constructor(private readonly prisma: PrismaService) {}
 
   async deleteClass(id: string) {
-    await this.ensureExists('class', await this.prisma.classroom.findUnique({ where: { id } }));
+    await this.ensureExists(
+      'class',
+      await this.prisma.classroom.findUnique({ where: { id } }),
+    );
     await this.prisma.classroom.delete({ where: { id } });
     return { message: 'Class deleted by moderation', data: null };
   }
 
   async deleteMaterial(id: string) {
-    await this.ensureExists('material', await this.prisma.material.findUnique({ where: { id } }));
+    await this.ensureExists(
+      'material',
+      await this.prisma.material.findUnique({ where: { id } }),
+    );
     await this.prisma.material.delete({ where: { id } });
     return { message: 'Material deleted by moderation', data: null };
   }

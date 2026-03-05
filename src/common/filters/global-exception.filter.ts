@@ -67,9 +67,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           const fallbackDetails = payload.error ?? payload.details ?? payload;
           if (
             typeof fallbackDetails === 'string' &&
-            ['Bad Request', 'Unauthorized', 'Forbidden', 'Not Found', 'Conflict'].includes(
-              fallbackDetails,
-            )
+            [
+              'Bad Request',
+              'Unauthorized',
+              'Forbidden',
+              'Not Found',
+              'Conflict',
+            ].includes(fallbackDetails)
           ) {
             details = payload.details;
           } else {

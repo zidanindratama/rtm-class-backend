@@ -18,7 +18,7 @@ NestJS backend API for RTM Class platform: authentication, user/class management
 - Admin users management
 - Classes: create, join by class code, members listing
 - Materials and AI outputs
-- AI jobs queue and callback handling
+- AI jobs queue and dispatch status tracking
 - Classroom forums (threads, comments, replies, upvotes)
 - Blogs (public read + admin CMS)
 - Cloudinary file uploads
@@ -75,7 +75,7 @@ copy .env.local.example .env.local
   - For Docker/dev networks, prefer SMTP mode: `EMAIL_PROVIDER=smtp`, `EMAIL_HOST=smtp.gmail.com`, `EMAIL_PORT=587`, `EMAIL_SECURE=false`, `EMAIL_REQUIRE_TLS=true`
   - To prevent `forgot-password` from failing when SMTP is unreachable, set `EMAIL_STRICT_MODE=false` (default) or fully bypass send with `EMAIL_DISABLE_SEND=true`
 - Cloudinary credentials for upload endpoint
-- AI integration variables if testing AI endpoints/callbacks
+- AI integration variables if testing AI endpoints
 
 ## Run Options
 

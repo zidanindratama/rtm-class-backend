@@ -15,6 +15,9 @@ async function bootstrap() {
     `SmartClass backend is running on http://localhost:${port}/api/v1`,
     'Bootstrap',
   );
-  Logger.log(`Swagger docs available at http://localhost:${port}/docs`, 'Bootstrap');
+  Logger.log(
+    `Swagger docs available at http://localhost:${port}/docs`,
+    'Bootstrap',
+  );
 }
 bootstrap();

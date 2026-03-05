@@ -23,7 +23,10 @@ export class ClassesService {
       OR:
         user.role === UserRole.ADMIN
           ? undefined
-          : [{ teacherId: user.sub }, { members: { some: { userId: user.sub } } }],
+          : [
+              { teacherId: user.sub },
+              { members: { some: { userId: user.sub } } },
+            ],
       name: query.search
         ? { contains: query.search, mode: 'insensitive' }
         : undefined,
@@ -219,7 +222,10 @@ export class ClassesService {
     const classroom = await this.prisma.classroom.findFirst({
       where: {
         id: classId,
-        OR: [{ teacherId: user.sub }, { members: { some: { userId: user.sub } } }],
+        OR: [
+          { teacherId: user.sub },
+          { members: { some: { userId: user.sub } } },
+        ],
       },
       select: { id: true },
     });

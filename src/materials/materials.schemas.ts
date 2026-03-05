@@ -22,7 +22,10 @@ export const publishAiOutputSchema = z.object({
   publish: z.boolean(),
 });
 
-export const allowedMaterialCreatorRoles: UserRole[] = [UserRole.ADMIN, UserRole.TEACHER];
+export const allowedMaterialCreatorRoles: UserRole[] = [
+  UserRole.ADMIN,
+  UserRole.TEACHER,
+];
 
 export type QueryMaterialsInput = z.infer<typeof queryMaterialsSchema>;
 export type CreateMaterialInput = z.infer<typeof createMaterialSchema>;

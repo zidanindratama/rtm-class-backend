@@ -20,7 +20,9 @@ export class AnalyticsService {
     await this.classesService.assertClassAccess(user, classId);
 
     if (user.role !== UserRole.ADMIN && user.role !== UserRole.TEACHER) {
-      throw new ForbiddenException('Only admin or teacher can access analytics');
+      throw new ForbiddenException(
+        'Only admin or teacher can access analytics',
+      );
     }
 
     const [classroom, students, publishedAssignments] = await Promise.all([
@@ -86,7 +88,9 @@ export class AnalyticsService {
     const totalExpectedSubmissions = totalStudents * totalPublishedAssignments;
     const totalSubmissions = submissions.length;
 
-    const gradedSubmissions = submissions.filter((row) => typeof row.score === 'number');
+    const gradedSubmissions = submissions.filter(
+      (row) => typeof row.score === 'number',
+    );
     const averageScore =
       gradedSubmissions.length > 0
         ? gradedSubmissions.reduce((sum, row) => sum + (row.score ?? 0), 0) /
@@ -94,7 +98,9 @@ export class AnalyticsService {
         : null;
 
     const passThreshold = query.passingScore;
-    const passCount = gradedSubmissions.filter((row) => (row.score ?? 0) >= passThreshold).length;
+    const passCount = gradedSubmissions.filter(
+      (row) => (row.score ?? 0) >= passThreshold,
+    ).length;
     const passRate =
       gradedSubmissions.length > 0
         ? Number(((passCount / gradedSubmissions.length) * 100).toFixed(2))
@@ -102,13 +108,16 @@ export class AnalyticsService {
 
     const assignmentToStudentSet = new Map<string, Set<string>>();
     for (const submission of submissions) {
-      const set = assignmentToStudentSet.get(submission.assignmentId) ?? new Set<string>();
+      const set =
+        assignmentToStudentSet.get(submission.assignmentId) ??
+        new Set<string>();
       set.add(submission.studentId);
       assignmentToStudentSet.set(submission.assignmentId, set);
     }
 
     const missingByAssignment = publishedAssignments.map((assignment) => {
-      const submittedSet = assignmentToStudentSet.get(assignment.id) ?? new Set<string>();
+      const submittedSet =
+        assignmentToStudentSet.get(assignment.id) ?? new Set<string>();
       const missingStudents = students
         .filter((member) => !submittedSet.has(member.user.id))
         .map((member) => ({
@@ -125,7 +134,10 @@ export class AnalyticsService {
       };
     });
 
-    const hardestQuestions = this.computeHardestQuestions(publishedAssignments, submissions);
+    const hardestQuestions = this.computeHardestQuestions(
+      publishedAssignments,
+      submissions,
+    );
 
     return {
       message: 'Class analytics fetched',
@@ -137,7 +149,11 @@ export class AnalyticsService {
           totalSubmissions,
           completionRate:
             totalExpectedSubmissions > 0
-              ? Number(((totalSubmissions / totalExpectedSubmissions) * 100).toFixed(2))
+              ? Number(
+                  ((totalSubmissions / totalExpectedSubmissions) * 100).toFixed(
+                    2,
+                  ),
+                )
               : 0,
           averageScore,
           passRate,
@@ -169,7 +185,8 @@ export class AnalyticsService {
     }> = [];
 
     for (const assignment of assignments) {
-      if (!assignment.content || typeof assignment.content !== 'object') continue;
+      if (!assignment.content || typeof assignment.content !== 'object')
+        continue;
 
       const questions = this.extractQuestions(assignment.content);
       if (questions.length === 0) continue;
@@ -186,14 +203,19 @@ export class AnalyticsService {
       for (const submission of relatedSubmissions) {
         const responses = this.extractResponses(submission.answers);
         for (const response of responses) {
-          const question = questions.find((row) => row.id === response.questionId);
+          const question = questions.find(
+            (row) => row.id === response.questionId,
+          );
           if (!question) continue;
 
           const counter = counters.get(question.id);
           if (!counter) continue;
 
           counter.total += 1;
-          if (String(response.answer).trim() !== String(question.correctAnswer).trim()) {
+          if (
+            String(response.answer).trim() !==
+            String(question.correctAnswer).trim()
+          ) {
             counter.wrong += 1;
           }
         }
@@ -214,27 +236,35 @@ export class AnalyticsService {
       }
     }
 
-    return result
-      .sort((a, b) => b.wrongRate - a.wrongRate)
-      .slice(0, 10);
+    return result.sort((a, b) => b.wrongRate - a.wrongRate).slice(0, 10);
   }
 
-  private extractQuestions(content: unknown): Array<{ id: string; correctAnswer: unknown }> {
+  private extractQuestions(
+    content: unknown,
+  ): Array<{ id: string; correctAnswer: unknown }> {
     if (typeof content !== 'object' || content === null) return [];
 
     const direct = (content as any).questions;
     const alt = (content as any).items;
-    const candidate = Array.isArray(direct) ? direct : Array.isArray(alt) ? alt : [];
+    const candidate = Array.isArray(direct)
+      ? direct
+      : Array.isArray(alt)
+        ? alt
+        : [];
 
     return candidate
       .map((row: any, index: number) => ({
         id: String(row?.id ?? row?.questionId ?? `q${index + 1}`),
         correctAnswer: row?.correctAnswer ?? row?.answer ?? row?.key,
       }))
-      .filter((row) => row.correctAnswer !== undefined && row.correctAnswer !== null);
+      .filter(
+        (row) => row.correctAnswer !== undefined && row.correctAnswer !== null,
+      );
   }
 
-  private extractResponses(answers: unknown): Array<{ questionId: string; answer: unknown }> {
+  private extractResponses(
+    answers: unknown,
+  ): Array<{ questionId: string; answer: unknown }> {
     if (typeof answers === 'string') return [];
 
     if (Array.isArray(answers)) {
