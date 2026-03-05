@@ -1,10 +1,11 @@
-﻿import {
+import {
   AIJobStatus,
   AIJobType,
   MaterialStatus,
   Prisma,
   UserRole,
 } from '@prisma/client';
+import { HttpService } from '@nestjs/axios';
 import {
   ForbiddenException,
   Injectable,
@@ -14,16 +15,12 @@ import {
   OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
-import Redis from 'ioredis';
+import { firstValueFrom } from 'rxjs';
 import { JwtPayload } from '../auth/types';
 import { ClassesService } from '../classes/classes.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { AiCallbackInput, EnqueueAiTransformInput } from './ai-jobs.schemas';
-
-type OAuthCache = {
-  token: string;
-  expiresAtEpochSec: number;
-};
 
 const WORKER_INTERVAL_MS = 5000;
 const OAUTH_CACHE_KEY = 'rtm:ai:oauth_token';
@@ -33,11 +30,12 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AiJobsService.name);
   private timer: NodeJS.Timeout | null = null;
   private running = false;
-  private redis: Redis | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly classesService: ClassesService,
+    private readonly httpService: HttpService,
+    private readonly redisService: RedisService,
   ) {}
 
   onModuleInit(): void {
@@ -51,14 +49,13 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
       clearInterval(this.timer);
       this.timer = null;
     }
-    if (this.redis) {
-      void this.redis.quit();
-    }
   }
 
   async enqueue(user: JwtPayload, input: EnqueueAiTransformInput) {
     if (user.role !== UserRole.ADMIN && user.role !== UserRole.TEACHER) {
-      throw new ForbiddenException('Only admin or teacher can generate AI outputs');
+      throw new ForbiddenException(
+        'Only admin or teacher can generate AI outputs',
+      );
     }
 
     const material = await this.prisma.material.findUnique({
@@ -150,7 +147,10 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
       };
     }
 
-    if (payload.status === AIJobStatus.succeeded || (payload.success && !payload.status)) {
+    if (
+      payload.status === AIJobStatus.succeeded ||
+      (payload.success && !payload.status)
+    ) {
       await this.prisma.$transaction([
         this.prisma.aiJob.update({
           where: { id: job.id },
@@ -294,12 +294,19 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
       const baseUrl = this.requireEnv('AI_BASE_URL');
       const callbackBase = this.requireEnv('AI_CALLBACK_BASE_URL');
 
-      const materialFileResponse = await fetch(job.material.fileUrl);
-      if (!materialFileResponse.ok) {
-        throw new Error(`Failed to download material file (${materialFileResponse.status})`);
+      const materialFileResponse = await firstValueFrom(
+        this.httpService.get<ArrayBuffer>(job.material.fileUrl, {
+          responseType: 'arraybuffer',
+          validateStatus: () => true,
+        }),
+      );
+      if (!this.isSuccessStatus(materialFileResponse.status)) {
+        throw new Error(
+          `Failed to download material file (${materialFileResponse.status})`,
+        );
       }
-      const arrayBuffer = await materialFileResponse.arrayBuffer();
-      const blob = new Blob([arrayBuffer]);
+
+      const blob = new Blob([materialFileResponse.data]);
 
       const parameters = (job.parameters ?? {}) as Record<string, unknown>;
       const form = new FormData();
@@ -318,22 +325,17 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
 
       this.applyParametersByType(form, job.type, parameters);
 
-      const response = await fetch(`${baseUrl}${endpointPath}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: form,
-      });
+      const response = await firstValueFrom(
+        this.httpService.post(`${baseUrl}${endpointPath}`, form, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          validateStatus: () => true,
+        }),
+      );
 
-      let responsePayload: unknown = null;
-      try {
-        responsePayload = await response.json();
-      } catch {
-        responsePayload = null;
-      }
-
-      if (!response.ok) {
+      const responsePayload = response.data ?? null;
+      if (!this.isSuccessStatus(response.status)) {
         const errorText =
           typeof responsePayload === 'object' && responsePayload !== null
             ? JSON.stringify(responsePayload)
@@ -376,7 +378,8 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
         }),
       ]);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown AI dispatch error';
+      const message =
+        error instanceof Error ? error.message : 'Unknown AI dispatch error';
       await this.prisma.aiJob.update({
         where: { id: job.id },
         data: {
@@ -398,13 +401,19 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
     const mcqEnabled = this.boolFromInput(parameters.mcqEnabled, true);
 
     if (type === AIJobType.MCQ) {
-      form.set('mcq_count', String(this.numberFromInput(parameters.mcqCount, 10)));
+      form.set(
+        'mcq_count',
+        String(this.numberFromInput(parameters.mcqCount, 10)),
+      );
       form.set('mcp_enabled', String(mcpEnabled));
       return;
     }
 
     if (type === AIJobType.ESSAY) {
-      form.set('essay_count', String(this.numberFromInput(parameters.essayCount, 5)));
+      form.set(
+        'essay_count',
+        String(this.numberFromInput(parameters.essayCount, 5)),
+      );
       form.set('mcp_enabled', String(mcpEnabled));
       return;
     }
@@ -438,7 +447,9 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  private extractSupportedExtensionFromUrl(url: string): '.pdf' | '.pptx' | '.txt' | null {
+  private extractSupportedExtensionFromUrl(
+    url: string,
+  ): '.pdf' | '.pptx' | '.txt' | null {
     const lower = url.toLowerCase();
     const pathname = (() => {
       try {
@@ -454,12 +465,18 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
     return null;
   }
 
-  private extensionFromMimeType(mimeType: string | null): '.pdf' | '.pptx' | '.txt' | null {
+  private extensionFromMimeType(
+    mimeType: string | null,
+  ): '.pdf' | '.pptx' | '.txt' | null {
     const normalized = mimeType?.trim().toLowerCase();
     if (!normalized) return null;
 
     if (normalized.includes('application/pdf')) return '.pdf';
-    if (normalized.includes('application/vnd.openxmlformats-officedocument.presentationml.presentation')) {
+    if (
+      normalized.includes(
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      )
+    ) {
       return '.pptx';
     }
     if (normalized.startsWith('text/plain')) return '.txt';
@@ -485,17 +502,20 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
 
   private async getOAuthAccessToken(): Promise<string> {
     const now = Math.floor(Date.now() / 1000);
-    const redis = this.getRedis();
-    if (redis) {
-      const cachedToken = await redis.get(OAUTH_CACHE_KEY);
-      if (cachedToken) return cachedToken;
+    const cachedToken = await this.redisService.get(OAUTH_CACHE_KEY);
+    if (cachedToken) {
+      return cachedToken;
     }
 
     const baseUrl = this.requireEnv('AI_BASE_URL');
     const clientId = this.getEnvAny(['AI_CLIENT_ID', 'OAUTH_CLIENT_ID']);
-    const clientSecret = this.getEnvAny(['AI_CLIENT_SECRET', 'OAUTH_CLIENT_SECRET']);
+    const clientSecret = this.getEnvAny([
+      'AI_CLIENT_SECRET',
+      'OAUTH_CLIENT_SECRET',
+    ]);
     const scope = process.env.AI_SCOPE ?? 'material:write lkpd:write lkpd:read';
-    const tokenEndpoint = process.env.AI_OAUTH_TOKEN_ENDPOINT ?? '/api/oauth/token';
+    const tokenEndpoint =
+      process.env.AI_OAUTH_TOKEN_ENDPOINT ?? '/api/oauth/token';
 
     const body = new URLSearchParams();
     body.set('grant_type', 'client_credentials');
@@ -503,61 +523,38 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
     body.set('client_secret', clientSecret);
     body.set('scope', scope);
 
-    const response = await fetch(`${baseUrl}${tokenEndpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
-    });
+    const response = await firstValueFrom(
+      this.httpService.post<{
+        access_token?: string;
+        expires_in?: number;
+        data?: { access_token?: string; expires_in?: number };
+      }>(`${baseUrl}${tokenEndpoint}`, body.toString(), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        validateStatus: () => true,
+      }),
+    );
 
-    if (!response.ok) {
-      let errorText = '';
-      try {
-        errorText = await response.text();
-      } catch {
-        errorText = '';
-      }
+    if (!this.isSuccessStatus(response.status)) {
+      const errorText = this.stringifyHttpPayload(response.data);
       throw new UnauthorizedException(
         `Failed to obtain AI OAuth access token (${response.status})${errorText ? `: ${errorText}` : ''}`,
       );
     }
 
-    const json = (await response.json()) as {
-      access_token?: string;
-      expires_in?: number;
-      data?: { access_token?: string; expires_in?: number };
-    };
+    const json = response.data;
     const token = json.access_token ?? json.data?.access_token;
     const expiresIn = json.expires_in ?? json.data?.expires_in ?? 300;
     if (!token) {
-      throw new UnauthorizedException('AI OAuth response does not contain access_token');
+      throw new UnauthorizedException(
+        'AI OAuth response does not contain access_token',
+      );
     }
 
     const ttl = Math.max(30, expiresIn - 30);
-    if (redis) {
-      await redis.set(OAUTH_CACHE_KEY, token, 'EX', ttl);
-    }
+    await this.redisService.setEx(OAUTH_CACHE_KEY, token, ttl);
 
-    const cache: OAuthCache = { token, expiresAtEpochSec: now + ttl };
-    this.logger.debug(`AI OAuth token refreshed. expires_at=${cache.expiresAtEpochSec}`);
-    return cache.token;
-  }
-
-  private getRedis(): Redis | null {
-    if (this.redis) return this.redis;
-
-    const redisUrl = process.env.REDIS_URL;
-    if (!redisUrl) return null;
-
-    this.redis = new Redis(redisUrl, {
-      lazyConnect: true,
-      maxRetriesPerRequest: 1,
-    });
-    this.redis.on('error', (error) => {
-      this.logger.warn(`Redis unavailable for AI token cache: ${error.message}`);
-    });
-
-    void this.redis.connect().catch(() => null);
-    return this.redis;
+    this.logger.debug(`AI OAuth token refreshed. expires_at=${now + ttl}`);
+    return token;
   }
 
   private async refreshMaterialStatus(materialId: string): Promise<void> {
@@ -569,7 +566,9 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
     let status: MaterialStatus = MaterialStatus.UPLOADED;
     if (
       jobs.some(
-        (job) => job.status === AIJobStatus.accepted || job.status === AIJobStatus.processing,
+        (job) =>
+          job.status === AIJobStatus.accepted ||
+          job.status === AIJobStatus.processing,
       )
     ) {
       status = MaterialStatus.PROCESSING;
@@ -661,18 +660,21 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
     if (!mirrorUrl) return;
 
     try {
-      await fetch(mirrorUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-source': 'rtm-class-backend',
-        },
-        body: JSON.stringify({
-          jobId,
-          forwardedAt: new Date().toISOString(),
-          payload,
-        }),
-      });
+      await firstValueFrom(
+        this.httpService.post(
+          mirrorUrl,
+          {
+            jobId,
+            forwardedAt: new Date().toISOString(),
+            payload,
+          },
+          {
+            headers: {
+              'x-source': 'rtm-class-backend',
+            },
+          },
+        ),
+      );
     } catch (error) {
       this.logger.warn(
         `Failed to mirror callback to ${mirrorUrl}: ${error instanceof Error ? error.message : 'unknown error'}`,
@@ -686,6 +688,21 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
       status === AIJobStatus.failed_processing ||
       status === AIJobStatus.failed_delivery
     );
+  }
+
+  private isSuccessStatus(status: number): boolean {
+    return status >= 200 && status < 300;
+  }
+
+  private stringifyHttpPayload(payload: unknown): string {
+    if (payload === null || payload === undefined) return '';
+    if (typeof payload === 'string') return payload;
+
+    try {
+      return JSON.stringify(payload);
+    } catch {
+      return String(payload);
+    }
   }
 
   private buildCallbackFailureMessage(payload: AiCallbackInput): string {
