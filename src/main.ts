@@ -4,6 +4,7 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
+import multipart from '@fastify/multipart';
 import { AppModule } from './app.module';
 import { configureApp } from './bootstrap';
 import { configureSwagger } from './swagger';
@@ -13,6 +14,7 @@ async function bootstrap() {
     AppModule,
     new FastifyAdapter(),
   );
+  await app.register(multipart as any);
   configureApp(app);
   configureSwagger(app);
 

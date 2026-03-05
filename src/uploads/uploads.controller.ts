@@ -2,8 +2,7 @@ import {
   BadRequestException,
   Controller,
   Post,
-  UploadedFile,
-  UseInterceptors,
+  Req,
 } from '@nestjs/common';
 import {
   ApiBody,
@@ -12,8 +11,11 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadsService } from './uploads.service';
+
+type MultipartRequestLike = {
+  file: () => Promise<{ toBuffer: () => Promise<Buffer> } | undefined>;
+};
 
 @Controller('uploads')
 @ApiTags('Uploads')
@@ -41,13 +43,15 @@ export class UploadsController {
       },
     },
   })
-  @UseInterceptors(FileInterceptor('file'))
-  async upload(@UploadedFile() file: Express.Multer.File) {
-    if (!file?.buffer) {
+  async upload(@Req() request: MultipartRequestLike) {
+    const file = await request.file();
+    const buffer = file ? await file.toBuffer() : null;
+
+    if (!buffer) {
       throw new BadRequestException('File is required');
     }
 
-    const res = await this.svc.uploadBuffer(file.buffer);
+    const res = await this.svc.uploadBuffer(buffer);
     return { url: res.secure_url, publicId: res.public_id };
   }
 }
