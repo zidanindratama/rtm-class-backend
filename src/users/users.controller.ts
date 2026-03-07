@@ -86,9 +86,17 @@ export class UsersController {
       required: ['fullName', 'email', 'password', 'role'],
       properties: {
         fullName: { type: 'string', example: 'Teacher One' },
-        email: { type: 'string', format: 'email', example: 'teacher@rtmclass.com' },
+        email: {
+          type: 'string',
+          format: 'email',
+          example: 'teacher@rtmclass.com',
+        },
         password: { type: 'string', minLength: 8, example: 'P@ssw0rd123' },
-        role: { type: 'string', enum: ['TEACHER', 'STUDENT'], example: 'TEACHER' },
+        role: {
+          type: 'string',
+          enum: ['TEACHER', 'STUDENT'],
+          example: 'TEACHER',
+        },
         isSuspended: { type: 'boolean', example: false },
         address: { type: 'string', example: 'Jakarta' },
         phoneNumber: { type: 'string', example: '+62812345678' },
@@ -112,13 +120,24 @@ export class UsersController {
       type: 'object',
       properties: {
         fullName: { type: 'string', example: 'Updated Name' },
-        email: { type: 'string', format: 'email', example: 'updated@rtmclass.com' },
+        email: {
+          type: 'string',
+          format: 'email',
+          example: 'updated@rtmclass.com',
+        },
         password: { type: 'string', minLength: 8, example: 'NewP@ssw0rd123' },
-        role: { type: 'string', enum: ['TEACHER', 'STUDENT'], example: 'STUDENT' },
+        role: {
+          type: 'string',
+          enum: ['TEACHER', 'STUDENT'],
+          example: 'STUDENT',
+        },
         isSuspended: { type: 'boolean', example: false },
         address: { type: 'string', example: 'Bandung' },
         phoneNumber: { type: 'string', example: '+628987654321' },
-        pictureUrl: { type: 'string', example: 'https://cdn.site/avatar-updated.png' },
+        pictureUrl: {
+          type: 'string',
+          example: 'https://cdn.site/avatar-updated.png',
+        },
       },
     },
   })

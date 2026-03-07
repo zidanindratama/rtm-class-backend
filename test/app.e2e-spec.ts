@@ -18,14 +18,11 @@ describe('AppController (e2e)', () => {
   });
 
   it('/api/v1 (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/api/v1')
-      .expect(200)
-      .expect({
-        message: 'Request successful',
-        data: 'Hello World!',
-        meta: null,
-        error: null,
-      });
+    return request(app.getHttpServer()).get('/api/v1').expect(200).expect({
+      message: 'Request successful',
+      data: 'Hello World!',
+      meta: null,
+      error: null,
+    });
   });
 });

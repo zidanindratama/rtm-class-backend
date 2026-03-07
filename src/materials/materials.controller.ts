@@ -21,7 +21,10 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { JwtPayload } from '../auth/types';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { createMaterialSchema, queryMaterialsSchema } from './materials.schemas';
+import {
+  createMaterialSchema,
+  queryMaterialsSchema,
+} from './materials.schemas';
 import { MaterialsService } from './materials.service';
 
 @Controller({ path: 'materials', version: '1' })
@@ -39,7 +42,11 @@ export class MaterialsController {
 
   @Get()
   @ApiOperation({ summary: 'List materials accessible by current user' })
-  @ApiQuery({ name: 'classId', required: false, schema: { type: 'string', format: 'uuid' } })
+  @ApiQuery({
+    name: 'classId',
+    required: false,
+    schema: { type: 'string', format: 'uuid' },
+  })
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'per_page', required: false, example: 10 })
   @ApiQuery({ name: 'search', required: false, example: 'algebra' })

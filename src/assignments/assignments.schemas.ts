@@ -1,4 +1,9 @@
-import { AssignmentStatus, AssignmentType, SubmissionStatus, UserRole } from '@prisma/client';
+import {
+  AssignmentStatus,
+  AssignmentType,
+  SubmissionStatus,
+  UserRole,
+} from '@prisma/client';
 import { z } from 'zod';
 import { paginationQuerySchema } from '../common/schemas/pagination.schema';
 
@@ -6,7 +11,9 @@ export const queryAssignmentsSchema = paginationQuerySchema.extend({
   classId: z.string().uuid().optional(),
   type: z.nativeEnum(AssignmentType).optional(),
   status: z.nativeEnum(AssignmentStatus).optional(),
-  sort_by: z.enum(['createdAt', 'publishedAt', 'dueAt', 'title']).default('createdAt'),
+  sort_by: z
+    .enum(['createdAt', 'publishedAt', 'dueAt', 'title'])
+    .default('createdAt'),
 });
 
 export const createAssignmentSchema = z.object({
@@ -51,7 +58,9 @@ export const querySubmissionsSchema = paginationQuerySchema.extend({
 });
 
 export const queryGradebookSchema = paginationQuerySchema.extend({
-  sort_by: z.enum(['fullName', 'email', 'avgScore', 'submissionRate']).default('fullName'),
+  sort_by: z
+    .enum(['fullName', 'email', 'avgScore', 'submissionRate'])
+    .default('fullName'),
   role: z.nativeEnum(UserRole).optional(),
 });
 

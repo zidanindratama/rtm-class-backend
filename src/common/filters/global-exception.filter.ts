@@ -7,9 +7,18 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-import { Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { ApiResponse } from '../types/api-response.type';
+
+type HttpRequestLike = {
+  method?: string;
+  url?: string;
+};
+
+type HttpResponseLike = {
+  status: (code: number) => HttpResponseLike;
+  send: (body: unknown) => void;
+};
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -17,8 +26,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    const response = ctx.getResponse<HttpResponseLike>();
+    const request = ctx.getRequest<HttpRequestLike>();
     const exposeStack = process.env.DEBUG_ERRORS === 'true';
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
@@ -67,9 +76,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           const fallbackDetails = payload.error ?? payload.details ?? payload;
           if (
             typeof fallbackDetails === 'string' &&
-            ['Bad Request', 'Unauthorized', 'Forbidden', 'Not Found', 'Conflict'].includes(
-              fallbackDetails,
-            )
+            [
+              'Bad Request',
+              'Unauthorized',
+              'Forbidden',
+              'Not Found',
+              'Conflict',
+            ].includes(fallbackDetails)
           ) {
             details = payload.details;
           } else {
@@ -112,7 +125,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       exception instanceof Error ? exception.stack : undefined,
     );
 
-    response.status(status).json(errorPayload);
+    response.status(status).send(errorPayload);
   }
 
   private mapPrismaKnownError(error: PrismaClientKnownRequestError): {

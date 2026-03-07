@@ -73,7 +73,9 @@ export class UsersService {
 
   async createUser(dto: CreateUserAdminInput) {
     if (!MANAGED_ROLES.includes(dto.role)) {
-      throw new BadRequestException('Admin can only create teacher or student accounts');
+      throw new BadRequestException(
+        'Admin can only create teacher or student accounts',
+      );
     }
 
     const existing = await this.prisma.user.findUnique({
@@ -125,7 +127,9 @@ export class UsersService {
     }
 
     if (dto.role && !MANAGED_ROLES.includes(dto.role)) {
-      throw new BadRequestException('Admin module only manages teacher and student accounts');
+      throw new BadRequestException(
+        'Admin module only manages teacher and student accounts',
+      );
     }
 
     const passwordHash = dto.password

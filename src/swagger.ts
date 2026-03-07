@@ -248,7 +248,11 @@ function enrichSwaggerDocument(document: any): void {
 
       if (Array.isArray(operation.parameters)) {
         operation.parameters.forEach((parameter: any) => {
-          if (!parameter || typeof parameter !== 'object' || '$ref' in parameter) {
+          if (
+            !parameter ||
+            typeof parameter !== 'object' ||
+            '$ref' in parameter
+          ) {
             return;
           }
 
@@ -257,7 +261,9 @@ function enrichSwaggerDocument(document: any): void {
 
           if (
             parameter.in === 'path' &&
-            (schema.format === 'uuid' || name === 'id' || name?.endsWith('Id')) &&
+            (schema.format === 'uuid' ||
+              name === 'id' ||
+              name?.endsWith('Id')) &&
             parameter.example === undefined
           ) {
             parameter.example = DEFAULT_UUID;
@@ -267,7 +273,10 @@ function enrichSwaggerDocument(document: any): void {
             if (schema.default === undefined && name in COMMON_QUERY_DEFAULTS) {
               schema.default = COMMON_QUERY_DEFAULTS[name];
             }
-            if (parameter.example === undefined && name in COMMON_QUERY_EXAMPLES) {
+            if (
+              parameter.example === undefined &&
+              name in COMMON_QUERY_EXAMPLES
+            ) {
               parameter.example = COMMON_QUERY_EXAMPLES[name];
             }
             if (
@@ -436,7 +445,7 @@ export function configureSwagger(app: INestApplication): void {
     )
     .addTag(
       'AI Jobs',
-      'Queue and monitor asynchronous AI transformations for materials, including provider callbacks.',
+      'Queue and monitor asynchronous AI transformations for materials via dispatch and database status tracking.',
     )
     .addTag(
       'Assignments',

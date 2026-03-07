@@ -47,7 +47,11 @@ export class ClassesController {
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'per_page', required: false, example: 10 })
   @ApiQuery({ name: 'search', required: false, example: 'Class X' })
-  @ApiQuery({ name: 'sort_by', required: false, enum: ['createdAt', 'name', 'classCode'] })
+  @ApiQuery({
+    name: 'sort_by',
+    required: false,
+    enum: ['createdAt', 'name', 'classCode'],
+  })
   @ApiQuery({ name: 'sort_order', required: false, enum: ['asc', 'desc'] })
   listClasses(
     @CurrentUser() user: JwtPayload,
@@ -81,7 +85,10 @@ export class ClassesController {
         institutionName: { type: 'string', example: 'SMA Negeri 1 Jakarta' },
         classLevel: { type: 'string', example: 'Grade 10' },
         academicYear: { type: 'string', example: '2026/2027' },
-        description: { type: 'string', example: 'Basic algebra and geometry class.' },
+        description: {
+          type: 'string',
+          example: 'Basic algebra and geometry class.',
+        },
       },
     },
   })
@@ -120,7 +127,11 @@ export class ClassesController {
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'per_page', required: false, example: 10 })
   @ApiQuery({ name: 'search', required: false, example: 'student' })
-  @ApiQuery({ name: 'sort_by', required: false, enum: ['createdAt', 'fullName', 'email'] })
+  @ApiQuery({
+    name: 'sort_by',
+    required: false,
+    enum: ['createdAt', 'fullName', 'email'],
+  })
   @ApiQuery({ name: 'sort_order', required: false, enum: ['asc', 'desc'] })
   listClassMembers(
     @CurrentUser() user: JwtPayload,

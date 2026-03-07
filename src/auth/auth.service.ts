@@ -81,12 +81,17 @@ export class AuthService {
       throw new UnauthorizedException('Account is suspended');
     }
 
-    const isValidPassword = await bcrypt.compare(dto.password, user.passwordHash);
+    const isValidPassword = await bcrypt.compare(
+      dto.password,
+      user.passwordHash,
+    );
     if (!isValidPassword) {
       throw new UnauthorizedException('Invalid email or password');
     }
     if (scope === 'ADMIN_ONLY' && user.role !== UserRole.ADMIN) {
-      throw new UnauthorizedException('This endpoint is only for admin sign-in');
+      throw new UnauthorizedException(
+        'This endpoint is only for admin sign-in',
+      );
     }
     if (
       scope === 'TEACHER_STUDENT_ONLY' &&
@@ -113,14 +118,19 @@ export class AuthService {
     let payload: JwtPayload;
 
     try {
-      payload = await this.jwtService.verifyAsync<JwtPayload>(dto.refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET ?? 'dev-refresh-secret',
-      });
+      payload = await this.jwtService.verifyAsync<JwtPayload>(
+        dto.refreshToken,
+        {
+          secret: process.env.JWT_REFRESH_SECRET ?? 'dev-refresh-secret',
+        },
+      );
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
@@ -140,7 +150,10 @@ export class AuthService {
 
     let matchedTokenId: string | null = null;
     for (const tokenRow of activeTokens) {
-      const isMatch = await bcrypt.compare(dto.refreshToken, tokenRow.tokenHash);
+      const isMatch = await bcrypt.compare(
+        dto.refreshToken,
+        tokenRow.tokenHash,
+      );
       if (isMatch) {
         matchedTokenId = tokenRow.id;
         break;
@@ -236,7 +249,12 @@ export class AuthService {
       },
     });
 
-    await this.mailService.sendOtpEmail(user.email, user.fullName, otpCode, otpExpiryMinutes);
+    await this.mailService.sendOtpEmail(
+      user.email,
+      user.fullName,
+      otpCode,
+      otpExpiryMinutes,
+    );
 
     return {
       message: 'If account exists, OTP has been sent to email',
@@ -302,7 +320,9 @@ export class AuthService {
       );
     }
 
-    const user = await this.prisma.user.findUnique({ where: { id: userPayload.sub } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userPayload.sub },
+    });
     if (!user) {
       throw new UnauthorizedException('User not found');
     }

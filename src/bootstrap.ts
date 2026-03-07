@@ -1,7 +1,4 @@
-import {
-  INestApplication,
-  VersioningType,
-} from '@nestjs/common';
+import { INestApplication, VersioningType } from '@nestjs/common';
 import helmet from 'helmet';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { ClientDomainGuard } from './common/guards/client-domain.guard';

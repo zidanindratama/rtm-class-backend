@@ -2,7 +2,12 @@ import { UserRole } from '@prisma/client';
 import { z } from 'zod';
 import { paginationQuerySchema } from '../common/schemas/pagination.schema';
 
-export const userSortFields = ['createdAt', 'fullName', 'email', 'role'] as const;
+export const userSortFields = [
+  'createdAt',
+  'fullName',
+  'email',
+  'role',
+] as const;
 
 export const queryUsersSchema = paginationQuerySchema.extend({
   role: z.nativeEnum(UserRole).optional(),

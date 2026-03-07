@@ -41,7 +41,9 @@ export class AssignmentsService {
       classroomId: query.classId,
       type: query.type,
       status: query.status,
-      title: query.search ? { contains: query.search, mode: 'insensitive' } : undefined,
+      title: query.search
+        ? { contains: query.search, mode: 'insensitive' }
+        : undefined,
       classroom:
         user.role === UserRole.ADMIN
           ? undefined
@@ -153,8 +155,14 @@ export class AssignmentsService {
     };
   }
 
-  async updateAssignment(user: JwtPayload, id: string, input: UpdateAssignmentInput) {
-    const assignment = await this.prisma.assignment.findUnique({ where: { id } });
+  async updateAssignment(
+    user: JwtPayload,
+    id: string,
+    input: UpdateAssignmentInput,
+  ) {
+    const assignment = await this.prisma.assignment.findUnique({
+      where: { id },
+    });
     if (!assignment) throw new NotFoundException('Assignment not found');
 
     await this.ensureCanManageClassContent(user, assignment.classroomId);
@@ -186,7 +194,7 @@ export class AssignmentsService {
         dueAt: input.dueAt,
         publishedAt:
           input.status === AssignmentStatus.PUBLISHED
-            ? assignment.publishedAt ?? new Date()
+            ? (assignment.publishedAt ?? new Date())
             : input.status === AssignmentStatus.DRAFT
               ? null
               : undefined,
@@ -204,8 +212,14 @@ export class AssignmentsService {
     };
   }
 
-  async publishAssignment(user: JwtPayload, id: string, input: PublishAssignmentInput) {
-    const assignment = await this.prisma.assignment.findUnique({ where: { id } });
+  async publishAssignment(
+    user: JwtPayload,
+    id: string,
+    input: PublishAssignmentInput,
+  ) {
+    const assignment = await this.prisma.assignment.findUnique({
+      where: { id },
+    });
     if (!assignment) throw new NotFoundException('Assignment not found');
 
     await this.ensureCanManageClassContent(user, assignment.classroomId);
@@ -216,7 +230,7 @@ export class AssignmentsService {
       data: {
         status: published ? AssignmentStatus.PUBLISHED : AssignmentStatus.DRAFT,
         publishedAt: published
-          ? input.publishedAt ?? assignment.publishedAt ?? new Date()
+          ? (input.publishedAt ?? assignment.publishedAt ?? new Date())
           : null,
       },
     });
@@ -227,7 +241,11 @@ export class AssignmentsService {
     };
   }
 
-  async submitAssignment(user: JwtPayload, assignmentId: string, input: SubmitAssignmentInput) {
+  async submitAssignment(
+    user: JwtPayload,
+    assignmentId: string,
+    input: SubmitAssignmentInput,
+  ) {
     if (user.role !== UserRole.STUDENT) {
       throw new ForbiddenException('Only students can submit assignments');
     }
@@ -337,7 +355,11 @@ export class AssignmentsService {
     };
   }
 
-  async gradeSubmission(user: JwtPayload, submissionId: string, input: GradeSubmissionInput) {
+  async gradeSubmission(
+    user: JwtPayload,
+    submissionId: string,
+    input: GradeSubmissionInput,
+  ) {
     const submission = await this.prisma.assignmentSubmission.findUnique({
       where: { id: submissionId },
       include: {
@@ -349,7 +371,10 @@ export class AssignmentsService {
 
     if (!submission) throw new NotFoundException('Submission not found');
 
-    await this.ensureCanManageClassContent(user, submission.assignment.classroomId);
+    await this.ensureCanManageClassContent(
+      user,
+      submission.assignment.classroomId,
+    );
 
     if (input.score > submission.assignment.maxScore) {
       throw new ForbiddenException('Score exceeds assignment maxScore');
@@ -432,10 +457,13 @@ export class AssignmentsService {
 
     const rows = students.map((member) => {
       const submissions = submissionByStudent.get(member.userId) ?? [];
-      const graded = submissions.filter((submission) => typeof submission.score === 'number');
+      const graded = submissions.filter(
+        (submission) => typeof submission.score === 'number',
+      );
       const avgScore =
         graded.length > 0
-          ? graded.reduce((sum, row) => sum + (row.score ?? 0), 0) / graded.length
+          ? graded.reduce((sum, row) => sum + (row.score ?? 0), 0) /
+            graded.length
           : null;
       const submissionRate =
         assignmentIds.length > 0
@@ -466,7 +494,10 @@ export class AssignmentsService {
       return av > bv ? order : -order;
     });
 
-    const paged = rows.slice((query.page - 1) * query.per_page, query.page * query.per_page);
+    const paged = rows.slice(
+      (query.page - 1) * query.per_page,
+      query.page * query.per_page,
+    );
 
     return {
       message: 'Class gradebook fetched',
@@ -476,7 +507,9 @@ export class AssignmentsService {
   }
 
   async deleteAssignment(user: JwtPayload, id: string) {
-    const assignment = await this.prisma.assignment.findUnique({ where: { id } });
+    const assignment = await this.prisma.assignment.findUnique({
+      where: { id },
+    });
     if (!assignment) throw new NotFoundException('Assignment not found');
 
     await this.ensureCanManageClassContent(user, assignment.classroomId);
@@ -491,7 +524,9 @@ export class AssignmentsService {
 
   private async ensureCanManageClassContent(user: JwtPayload, classId: string) {
     if (user.role !== UserRole.ADMIN && user.role !== UserRole.TEACHER) {
-      throw new ForbiddenException('Only admin or teacher can manage class assignments');
+      throw new ForbiddenException(
+        'Only admin or teacher can manage class assignments',
+      );
     }
 
     await this.classesService.assertClassAccess(user, classId);

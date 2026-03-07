@@ -111,7 +111,10 @@ export class ForumsController {
       type: 'object',
       required: ['content'],
       properties: {
-        content: { type: 'string', example: 'I think the answer is on slide 15.' },
+        content: {
+          type: 'string',
+          example: 'I think the answer is on slide 15.',
+        },
       },
     },
   })

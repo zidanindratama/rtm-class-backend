@@ -73,7 +73,10 @@ export class BlogsAdminController {
         title: { type: 'string', example: 'How AI helps classroom' },
         slug: { type: 'string', example: 'how-ai-helps-classroom' },
         excerpt: { type: 'string', example: 'Short summary for landing page' },
-        content: { type: 'string', example: 'Full article markdown or html content...' },
+        content: {
+          type: 'string',
+          example: 'Full article markdown or html content...',
+        },
         isPublished: { type: 'boolean', example: true },
       },
     },
