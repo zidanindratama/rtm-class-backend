@@ -15,8 +15,14 @@ describe('AppController', () => {
   });
 
   describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+    it('should return the service status payload', () => {
+      expect(appController.getHello()).toEqual(
+        expect.objectContaining({
+          status: 'ok',
+          service: 'rtm-class-backend',
+          message: 'RTM Class backend server is running.',
+        }),
+      );
     });
   });
 });

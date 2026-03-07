@@ -13,7 +13,19 @@ export function configureApp(app: INestApplication): void {
     origin.toLowerCase().replace(/\/$/, ''),
   );
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+          "default-src": ["'self'"],
+          "img-src": ["'self'", 'data:', 'https:'],
+          "script-src": ["'self'", "'unsafe-inline'"],
+          "style-src": ["'self'", "'unsafe-inline'"],
+        },
+      },
+    }),
+  );
   app.enableCors({
     origin: corsOrigins.length > 0 ? corsOrigins : true,
     credentials: true,
