@@ -20,4 +20,5 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/mail/templates ./dist/mail/templates
 EXPOSE 5000
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]
+
