@@ -30,13 +30,7 @@ export class MailService {
       },
     });
 
-    const templatePath = path.join(
-      process.cwd(),
-      'src',
-      'mail',
-      'templates',
-      'forgot-password.hbs',
-    );
+    const templatePath = this.resolveTemplatePath('forgot-password.hbs');
     const templateSource = fs.readFileSync(templatePath, 'utf8');
     const html = handlebars.compile(templateSource)({
       fullName,
@@ -50,5 +44,23 @@ export class MailService {
       subject: 'Kode OTP Reset Password RTM Class',
       html,
     });
+  }
+
+  private resolveTemplatePath(templateFileName: string): string {
+    const candidatePaths = [
+      path.join(process.cwd(), 'dist', 'mail', 'templates', templateFileName),
+      path.join(process.cwd(), 'dist', 'src', 'mail', 'templates', templateFileName),
+      path.join(process.cwd(), 'src', 'mail', 'templates', templateFileName),
+    ];
+
+    const existingPath = candidatePaths.find((candidatePath) =>
+      fs.existsSync(candidatePath),
+    );
+
+    if (!existingPath) {
+      throw new Error(`Mail template not found: ${templateFileName}`);
+    }
+
+    return existingPath;
   }
 }

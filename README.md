@@ -101,6 +101,70 @@ Notes:
 - Swagger UI auto-injects `x-client-domain` and can auto-store/reuse the latest access token after successful auth flows.
 - All entity IDs in API path/query/body use UUID v4 format (example: `550e8400-e29b-41d4-a716-446655440000`).
 
+## VPS Deployment
+
+This repository is ready for Docker-based deployment to a VPS and supports automatic deployment from GitHub Actions when `main` changes.
+
+### What was fixed for production
+- Prisma client is now generated during Docker build, so `docker build` does not fail because of missing Prisma types.
+- Email templates are included in the production image, so forgot-password emails do not break at runtime.
+- A dedicated `api-migrate` service is available for `prisma migrate deploy` before the API is restarted.
+
+### One-time VPS bootstrap
+1. Install Docker Engine with Docker Compose plugin and Git on the VPS.
+2. Clone this repository on the VPS to a fixed directory, for example:
+```bash
+mkdir -p /opt/rtm-class-backend
+cd /opt/rtm-class-backend
+git clone <your-repository-url> .
+```
+3. Create the production env file:
+```bash
+cp .env.example .env
+```
+4. Edit `.env` for production values:
+- set strong JWT secrets
+- set real `CORS_ORIGINS`
+- set real Cloudinary and email credentials
+- keep `DATABASE_URL` host as `postgres`
+- keep `REDIS_URL` host as `redis`
+5. Run the first deployment manually:
+```bash
+chmod +x scripts/deploy.sh
+APP_DIR=/opt/rtm-class-backend ./scripts/deploy.sh
+```
+
+### GitHub Actions auto-deploy
+The workflow file is at `.github/workflows/ci-cd.yml`.
+
+On every pull request and push, it runs:
+- `npm ci`
+- `npx prisma generate`
+- `npm run build`
+- `npx jest --runInBand`
+- `docker build`
+
+On every push to `main`, it also connects to the VPS and runs the deploy script.
+
+Add these GitHub repository secrets:
+- `VPS_HOST`
+- `VPS_PORT`
+- `VPS_USERNAME`
+- `VPS_PASSWORD`
+- `VPS_APP_DIR`
+
+Example:
+- `VPS_HOST=43.157.247.2`
+- `VPS_PORT=22`
+- `VPS_USERNAME=jidan`
+- `VPS_APP_DIR=/opt/rtm-class-backend`
+
+After that, each change merged into `main` will:
+1. pull the latest code on the VPS
+2. rebuild the Docker images
+3. run `prisma migrate deploy`
+4. restart the API container
+
 ## Development Commands
 ```bash
 # build
