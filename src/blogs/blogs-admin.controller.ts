@@ -63,6 +63,17 @@ export class BlogsAdminController {
     return this.blogsService.adminListPosts(query as any);
   }
 
+  @Get(':id')
+  @ApiOperation({ summary: 'Get blog detail (admin)' })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  getPostById(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
+    return this.blogsService.adminGetPostById(id);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Create blog post' })
   @ApiBody({
@@ -73,7 +84,10 @@ export class BlogsAdminController {
         title: { type: 'string', example: 'How AI helps classroom' },
         slug: { type: 'string', example: 'how-ai-helps-classroom' },
         excerpt: { type: 'string', example: 'Short summary for landing page' },
-        content: { type: 'string', example: 'Full article markdown or html content...' },
+        content: {
+          type: 'string',
+          example: 'Full article markdown or html content...',
+        },
         isPublished: { type: 'boolean', example: true },
       },
     },
@@ -120,5 +134,19 @@ export class BlogsAdminController {
   })
   deletePost(@Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.blogsService.deletePost(id);
+  }
+
+  @Delete('comments/:id')
+  @ApiOperation({ summary: 'Delete blog comment (admin)' })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  deleteComment(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
+    return this.blogsService.deleteCommentByAdmin(user, id);
   }
 }
