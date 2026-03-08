@@ -124,6 +124,30 @@ export class BlogsService {
     };
   }
 
+  async adminGetPostById(id: string) {
+    const post = await this.prisma.blogPost.findUnique({
+      where: { id },
+      include: {
+        author: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Blog post not found');
+    }
+
+    return {
+      message: 'Blog post fetched',
+      data: post,
+    };
+  }
+
   async createPost(adminId: string, dto: CreateBlogInput) {
     const slug = await this.ensureUniqueSlug(
       dto.slug ?? this.slugify(dto.title),
