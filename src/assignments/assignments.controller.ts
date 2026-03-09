@@ -38,6 +38,7 @@ import {
   publishAssignmentSchema,
   queryAssignmentsSchema,
   queryGradebookSchema,
+  querySubmissionAttemptsSchema,
   querySubmissionsSchema,
   submitAssignmentSchema,
   updateAssignmentSchema,
@@ -253,6 +254,34 @@ export class AssignmentsController {
     return this.assignmentsService.getMySubmission(user, assignmentId);
   }
 
+  @Get(':id/my-attempts')
+  @Roles(UserRole.STUDENT)
+  @ApiOperation({ summary: 'List my submission attempts for an assignment' })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'per_page', required: false, example: 10 })
+  @ApiQuery({
+    name: 'sort_by',
+    required: false,
+    enum: ['attemptNumber', 'submittedAt', 'createdAt'],
+  })
+  @ApiQuery({ name: 'sort_order', required: false, enum: ['asc', 'desc'] })
+  getMyAttempts(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) assignmentId: string,
+    @Query(new ZodValidationPipe(querySubmissionAttemptsSchema)) query: unknown,
+  ) {
+    return this.assignmentsService.listMySubmissionAttempts(
+      user,
+      assignmentId,
+      query as any,
+    );
+  }
+
   @Get(':id/submissions')
   @Roles(UserRole.ADMIN, UserRole.TEACHER)
   @ApiOperation({ summary: 'List submissions for an assignment' })
@@ -323,6 +352,35 @@ export class AssignmentsController {
       user,
       submissionId,
       body as any,
+    );
+  }
+
+  @Get('submissions/:submissionId/attempts')
+  @Roles(UserRole.ADMIN, UserRole.TEACHER)
+  @ApiOperation({ summary: 'List attempts for one submission' })
+  @ApiParam({
+    name: 'submissionId',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'per_page', required: false, example: 10 })
+  @ApiQuery({
+    name: 'sort_by',
+    required: false,
+    enum: ['attemptNumber', 'submittedAt', 'createdAt'],
+  })
+  @ApiQuery({ name: 'sort_order', required: false, enum: ['asc', 'desc'] })
+  listSubmissionAttempts(
+    @CurrentUser() user: JwtPayload,
+    @Param('submissionId', new ParseUUIDPipe({ version: '4' }))
+    submissionId: string,
+    @Query(new ZodValidationPipe(querySubmissionAttemptsSchema)) query: unknown,
+  ) {
+    return this.assignmentsService.listSubmissionAttempts(
+      user,
+      submissionId,
+      query as any,
     );
   }
 

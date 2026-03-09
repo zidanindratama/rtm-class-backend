@@ -22,6 +22,16 @@ This changelog combines:
 - Assignments API:
   - `PATCH /v1/assignments/:id/close` (explicit close endpoint)
   - `GET /v1/assignments/:id/my-submission` (student own submission)
+  - `GET /v1/assignments/:id/my-attempts` (student attempt history with pagination)
+  - `GET /v1/assignments/submissions/:submissionId/attempts` (teacher/admin attempt history view)
+  - stricter structured payload contracts for:
+    - `content` (rich text + question set schema)
+    - `answers` (typed submit formats: `MCQ`, `ESSAY`, `TEXT`, `GENERIC`)
+    - `attachments` (file metadata for submission files)
+  - automatic MCQ submission grading on student submit:
+    - auto score calculation by answer key
+    - immediate `GRADED` status for MCQ auto-graded submissions
+  - per-question grading records support on manual grading endpoint (`questionGrades[]`, optional `attemptId`)
 
 ### Changed
 - Swagger route coverage expanded in controllers for the new endpoints above.
@@ -30,6 +40,14 @@ This changelog combines:
   - class delete/member removal restricted to class owner teacher or admin
   - material delete restricted to material owner (or class teacher) or admin
   - forum edit/delete restricted to author or admin
+- Assignment business rules hardening:
+  - score policy validation (`passingScore <= maxScore`)
+  - question-point sum validation cannot exceed `maxScore`
+  - update restrictions after assignment is closed
+  - update restrictions on core assessment fields after submissions exist
+  - submission validation is now assignment-type aware (no free-form answer shape)
+  - every submission now creates an immutable attempt record, including answers snapshot and linked file attachments
+  - MCQ auto-grading now also stores per-question grading rows for audit/analytics usage
 
 ### Technical Notes
 - Build verified successfully after API expansion (`npm run build`).
