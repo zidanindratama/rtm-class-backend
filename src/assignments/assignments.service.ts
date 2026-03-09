@@ -241,6 +241,27 @@ export class AssignmentsService {
     };
   }
 
+  async closeAssignment(user: JwtPayload, id: string) {
+    const assignment = await this.prisma.assignment.findUnique({
+      where: { id },
+    });
+    if (!assignment) throw new NotFoundException('Assignment not found');
+
+    await this.ensureCanManageClassContent(user, assignment.classroomId);
+
+    const updated = await this.prisma.assignment.update({
+      where: { id },
+      data: {
+        status: AssignmentStatus.CLOSED,
+      },
+    });
+
+    return {
+      message: 'Assignment closed',
+      data: updated,
+    };
+  }
+
   async submitAssignment(
     user: JwtPayload,
     assignmentId: string,
@@ -297,6 +318,46 @@ export class AssignmentsService {
 
     return {
       message: 'Assignment submitted',
+      data: submission,
+    };
+  }
+
+  async getMySubmission(user: JwtPayload, assignmentId: string) {
+    if (user.role !== UserRole.STUDENT) {
+      throw new ForbiddenException('Only students can access this endpoint');
+    }
+
+    const assignment = await this.prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: { id: true, classroomId: true },
+    });
+
+    if (!assignment) {
+      throw new NotFoundException('Assignment not found');
+    }
+
+    await this.classesService.assertClassAccess(user, assignment.classroomId);
+
+    const submission = await this.prisma.assignmentSubmission.findUnique({
+      where: {
+        assignmentId_studentId: {
+          assignmentId,
+          studentId: user.sub,
+        },
+      },
+      include: {
+        gradedBy: {
+          select: { id: true, fullName: true, email: true },
+        },
+      },
+    });
+
+    if (!submission) {
+      throw new NotFoundException('Submission not found');
+    }
+
+    return {
+      message: 'My submission fetched',
       data: submission,
     };
   }

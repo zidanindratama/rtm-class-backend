@@ -175,6 +175,21 @@ export class AssignmentsController {
     return this.assignmentsService.publishAssignment(user, id, body as any);
   }
 
+  @Patch(':id/close')
+  @Roles(UserRole.ADMIN, UserRole.TEACHER)
+  @ApiOperation({ summary: 'Close assignment explicitly' })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  closeAssignment(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
+    return this.assignmentsService.closeAssignment(user, id);
+  }
+
   @Post(':id/submit')
   @Roles(UserRole.STUDENT)
   @ApiOperation({ summary: 'Submit assignment answers (student)' })
@@ -221,6 +236,21 @@ export class AssignmentsController {
     @Body(new ZodValidationPipe(submitAssignmentSchema)) body: unknown,
   ) {
     return this.assignmentsService.submitAssignment(user, id, body as any);
+  }
+
+  @Get(':id/my-submission')
+  @Roles(UserRole.STUDENT)
+  @ApiOperation({ summary: 'Get my own submission for an assignment' })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  getMySubmission(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) assignmentId: string,
+  ) {
+    return this.assignmentsService.getMySubmission(user, assignmentId);
   }
 
   @Get(':id/submissions')

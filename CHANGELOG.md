@@ -6,7 +6,35 @@ This changelog combines:
 - committed history from Git
 - latest local work in the current working tree
 
-## [2026-03-04] - Local Working Tree (Not Yet Committed)
+## [2026-03-09]
+### Added
+- Classes API:
+  - `DELETE /v1/classes/:id` (delete class by owner teacher or admin)
+  - `POST /v1/classes/:id/leave` (student leaves class)
+  - `DELETE /v1/classes/:id/members/:userId` (owner/admin removes member)
+- Materials API:
+  - `DELETE /v1/materials/:id` (delete material by owner/admin)
+- Forums API (author/admin self-service):
+  - `PATCH /v1/forums/threads/:threadId`
+  - `DELETE /v1/forums/threads/:threadId`
+  - `PATCH /v1/forums/comments/:commentId`
+  - `DELETE /v1/forums/comments/:commentId`
+- Assignments API:
+  - `PATCH /v1/assignments/:id/close` (explicit close endpoint)
+  - `GET /v1/assignments/:id/my-submission` (student own submission)
+
+### Changed
+- Swagger route coverage expanded in controllers for the new endpoints above.
+- Postman collection updated to include all newly added routes and request templates.
+- Authorization rules refined for ownership-based delete/edit flows:
+  - class delete/member removal restricted to class owner teacher or admin
+  - material delete restricted to material owner (or class teacher) or admin
+  - forum edit/delete restricted to author or admin
+
+### Technical Notes
+- Build verified successfully after API expansion (`npm run build`).
+
+## [2026-03-04]
 ### Added
 - New domain modules:
   - `assignments` (timeline/list/detail/create/publish/submit/list submissions/grade/gradebook/delete)

@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  Patch,
   Param,
   ParseUUIDPipe,
   Post,
@@ -24,6 +26,7 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import {
   createMaterialSchema,
   queryMaterialsSchema,
+  updateMaterialSchema,
 } from './materials.schemas';
 import { MaterialsService } from './materials.service';
 
@@ -93,6 +96,49 @@ export class MaterialsController {
     @Body(new ZodValidationPipe(createMaterialSchema)) body: unknown,
   ) {
     return this.materialsService.createMaterial(user, body as any);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update material metadata' })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', example: 'Bab 1 Aljabar Linear (Revisi)' },
+        description: {
+          type: 'string',
+          example: 'Materi pertemuan pertama versi update.',
+        },
+        fileUrl: { type: 'string', format: 'uri' },
+        fileMimeType: { type: 'string', example: 'application/pdf' },
+      },
+    },
+  })
+  updateMaterial(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body(new ZodValidationPipe(updateMaterialSchema)) body: unknown,
+  ) {
+    return this.materialsService.updateMaterial(user, id, body as any);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete material (owner/admin)' })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  deleteMaterial(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
+    return this.materialsService.deleteMaterial(user, id);
   }
 
   @Get(':id/outputs')

@@ -8,7 +8,11 @@ import { JwtPayload } from '../auth/types';
 import { ClassesService } from '../classes/classes.service';
 import { buildListMeta, clampSortOrder } from '../common/utils/list-query';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateMaterialInput, QueryMaterialsInput } from './materials.schemas';
+import {
+  CreateMaterialInput,
+  QueryMaterialsInput,
+  UpdateMaterialInput,
+} from './materials.schemas';
 
 @Injectable()
 export class MaterialsService {
@@ -156,6 +160,55 @@ export class MaterialsService {
     };
   }
 
+  async updateMaterial(
+    user: JwtPayload,
+    id: string,
+    input: UpdateMaterialInput,
+  ) {
+    const material = await this.prisma.material.findUnique({
+      where: { id },
+      select: { id: true, classroomId: true },
+    });
+
+    if (!material) {
+      throw new NotFoundException('Material not found');
+    }
+
+    await this.ensureCanManageMaterial(user, material.classroomId);
+
+    const updated = await this.prisma.material.update({
+      where: { id },
+      data: {
+        title: input.title,
+        description: input.description,
+        fileUrl: input.fileUrl,
+        fileMimeType: input.fileMimeType,
+      },
+      include: {
+        classroom: {
+          select: {
+            id: true,
+            name: true,
+            classCode: true,
+          },
+        },
+        uploadedBy: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    return {
+      message: 'Material updated',
+      data: updated,
+    };
+  }
+
   async getMaterialOutputs(user: JwtPayload, materialId: string) {
     const material = await this.prisma.material.findUnique({
       where: { id: materialId },
@@ -190,5 +243,65 @@ export class MaterialsService {
       message: 'Material AI outputs fetched',
       data: outputs,
     };
+  }
+
+  async deleteMaterial(user: JwtPayload, id: string) {
+    const material = await this.prisma.material.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        classroomId: true,
+        uploadedById: true,
+        classroom: {
+          select: { teacherId: true },
+        },
+      },
+    });
+
+    if (!material) {
+      throw new NotFoundException('Material not found');
+    }
+
+    this.assertMaterialOwnerOrAdmin(user, {
+      uploadedById: material.uploadedById,
+      classTeacherId: material.classroom.teacherId,
+    });
+
+    await this.prisma.material.delete({
+      where: { id },
+    });
+
+    return {
+      message: 'Material deleted',
+      data: null,
+    };
+  }
+
+  private async ensureCanManageMaterial(user: JwtPayload, classId: string) {
+    if (user.role !== UserRole.ADMIN && user.role !== UserRole.TEACHER) {
+      throw new ForbiddenException('Only admin or teacher can manage material');
+    }
+
+    await this.classesService.assertClassAccess(user, classId);
+  }
+
+  private assertMaterialOwnerOrAdmin(
+    user: JwtPayload,
+    ownership: { uploadedById: string; classTeacherId: string },
+  ) {
+    if (user.role === UserRole.ADMIN) {
+      return;
+    }
+
+    if (user.role !== UserRole.TEACHER) {
+      throw new ForbiddenException('Only material owner or admin can do this');
+    }
+
+    if (
+      user.sub !== ownership.uploadedById &&
+      user.sub !== ownership.classTeacherId
+    ) {
+      throw new ForbiddenException('Only material owner or admin can do this');
+    }
   }
 }
