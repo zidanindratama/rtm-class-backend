@@ -15,6 +15,13 @@ export const createClassSchema = z.object({
   description: z.string().trim().optional(),
 });
 
+export const updateClassSchema = createClassSchema.partial().refine(
+  (value) => Object.keys(value).length > 0,
+  {
+    message: 'At least one field must be provided',
+  },
+);
+
 export const joinClassSchema = z.object({
   classCode: z.string().trim().min(4).max(32),
 });
@@ -25,5 +32,6 @@ export const queryClassMembersSchema = paginationQuerySchema.extend({
 
 export type QueryClassesInput = z.infer<typeof queryClassesSchema>;
 export type CreateClassInput = z.infer<typeof createClassSchema>;
+export type UpdateClassInput = z.infer<typeof updateClassSchema>;
 export type JoinClassInput = z.infer<typeof joinClassSchema>;
 export type QueryClassMembersInput = z.infer<typeof queryClassMembersSchema>;

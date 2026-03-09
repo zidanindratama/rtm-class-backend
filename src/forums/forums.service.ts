@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 import { JwtPayload } from '../auth/types';
 import { ClassesService } from '../classes/classes.service';
 import { buildListMeta, clampSortOrder } from '../common/utils/list-query';
@@ -7,6 +12,8 @@ import {
   CreateForumCommentInput,
   CreateForumThreadInput,
   ListForumThreadsInput,
+  UpdateForumCommentInput,
+  UpdateForumThreadInput,
 } from './forums.schemas';
 
 @Injectable()
@@ -147,6 +154,65 @@ export class ForumsService {
     };
   }
 
+  async updateThread(
+    user: JwtPayload,
+    threadId: string,
+    input: UpdateForumThreadInput,
+  ) {
+    const thread = await this.prisma.forumThread.findUnique({
+      where: { id: threadId },
+      select: { id: true, classroomId: true, authorId: true },
+    });
+
+    if (!thread) {
+      throw new NotFoundException('Thread not found');
+    }
+
+    await this.classesService.assertClassAccess(user, thread.classroomId);
+    this.assertAuthorOrAdmin(user, thread.authorId);
+
+    const updated = await this.prisma.forumThread.update({
+      where: { id: threadId },
+      data: {
+        title: input.title,
+        content: input.content,
+      },
+      include: {
+        author: {
+          select: { id: true, fullName: true, email: true },
+        },
+      },
+    });
+
+    return {
+      message: 'Forum thread updated',
+      data: updated,
+    };
+  }
+
+  async deleteThread(user: JwtPayload, threadId: string) {
+    const thread = await this.prisma.forumThread.findUnique({
+      where: { id: threadId },
+      select: { id: true, classroomId: true, authorId: true },
+    });
+
+    if (!thread) {
+      throw new NotFoundException('Thread not found');
+    }
+
+    await this.classesService.assertClassAccess(user, thread.classroomId);
+    this.assertAuthorOrAdmin(user, thread.authorId);
+
+    await this.prisma.forumThread.delete({
+      where: { id: threadId },
+    });
+
+    return {
+      message: 'Forum thread deleted',
+      data: null,
+    };
+  }
+
   async createComment(
     user: JwtPayload,
     threadId: string,
@@ -215,6 +281,76 @@ export class ForumsService {
     );
   }
 
+  async updateComment(
+    user: JwtPayload,
+    commentId: string,
+    input: UpdateForumCommentInput,
+  ) {
+    const comment = await this.prisma.forumComment.findUnique({
+      where: { id: commentId },
+      include: {
+        thread: {
+          select: { classroomId: true },
+        },
+      },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    await this.classesService.assertClassAccess(
+      user,
+      comment.thread.classroomId,
+    );
+    this.assertAuthorOrAdmin(user, comment.authorId);
+
+    const updated = await this.prisma.forumComment.update({
+      where: { id: commentId },
+      data: { content: input.content },
+      include: {
+        author: {
+          select: { id: true, fullName: true, email: true },
+        },
+      },
+    });
+
+    return {
+      message: 'Forum comment updated',
+      data: updated,
+    };
+  }
+
+  async deleteComment(user: JwtPayload, commentId: string) {
+    const comment = await this.prisma.forumComment.findUnique({
+      where: { id: commentId },
+      include: {
+        thread: {
+          select: { classroomId: true },
+        },
+      },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    await this.classesService.assertClassAccess(
+      user,
+      comment.thread.classroomId,
+    );
+    this.assertAuthorOrAdmin(user, comment.authorId);
+
+    await this.prisma.forumComment.delete({
+      where: { id: commentId },
+    });
+
+    return {
+      message: 'Forum comment deleted',
+      data: null,
+    };
+  }
+
   async toggleThreadUpvote(user: JwtPayload, threadId: string) {
     const thread = await this.prisma.forumThread.findUnique({
       where: { id: threadId },
@@ -278,5 +414,15 @@ export class ForumsService {
     });
 
     return { message: 'Comment upvoted', data: { upvoted: true } };
+  }
+
+  private assertAuthorOrAdmin(user: JwtPayload, authorId: string) {
+    if (user.role === UserRole.ADMIN) {
+      return;
+    }
+
+    if (user.sub !== authorId) {
+      throw new ForbiddenException('Only author or admin can do this action');
+    }
   }
 }

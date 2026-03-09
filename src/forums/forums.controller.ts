@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  Patch,
   ParseUUIDPipe,
   Param,
   Post,
@@ -25,6 +27,8 @@ import {
   createForumCommentSchema,
   createForumThreadSchema,
   listForumThreadsSchema,
+  updateForumCommentSchema,
+  updateForumThreadSchema,
 } from './forums.schemas';
 import { ForumsService } from './forums.service';
 
@@ -99,6 +103,44 @@ export class ForumsController {
     return this.forumsService.createThread(user, body as any);
   }
 
+  @Patch('threads/:threadId')
+  @ApiOperation({ summary: 'Update forum thread (author/admin)' })
+  @ApiParam({
+    name: 'threadId',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', example: 'Updated thread title' },
+        content: { type: 'string', example: 'Updated thread content.' },
+      },
+    },
+  })
+  updateThread(
+    @CurrentUser() user: JwtPayload,
+    @Param('threadId', new ParseUUIDPipe({ version: '4' })) threadId: string,
+    @Body(new ZodValidationPipe(updateForumThreadSchema)) body: unknown,
+  ) {
+    return this.forumsService.updateThread(user, threadId, body as any);
+  }
+
+  @Delete('threads/:threadId')
+  @ApiOperation({ summary: 'Delete forum thread (author/admin)' })
+  @ApiParam({
+    name: 'threadId',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  deleteThread(
+    @CurrentUser() user: JwtPayload,
+    @Param('threadId', new ParseUUIDPipe({ version: '4' })) threadId: string,
+  ) {
+    return this.forumsService.deleteThread(user, threadId);
+  }
+
   @Post('threads/:threadId/comments')
   @ApiOperation({ summary: 'Create comment on thread' })
   @ApiParam({
@@ -148,6 +190,44 @@ export class ForumsController {
     @Body(new ZodValidationPipe(createForumCommentSchema)) body: unknown,
   ) {
     return this.forumsService.replyToComment(user, commentId, body as any);
+  }
+
+  @Patch('comments/:commentId')
+  @ApiOperation({ summary: 'Update comment/reply (author/admin)' })
+  @ApiParam({
+    name: 'commentId',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['content'],
+      properties: {
+        content: { type: 'string', example: 'Updated comment content.' },
+      },
+    },
+  })
+  updateComment(
+    @CurrentUser() user: JwtPayload,
+    @Param('commentId', new ParseUUIDPipe({ version: '4' })) commentId: string,
+    @Body(new ZodValidationPipe(updateForumCommentSchema)) body: unknown,
+  ) {
+    return this.forumsService.updateComment(user, commentId, body as any);
+  }
+
+  @Delete('comments/:commentId')
+  @ApiOperation({ summary: 'Delete comment/reply (author/admin)' })
+  @ApiParam({
+    name: 'commentId',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  deleteComment(
+    @CurrentUser() user: JwtPayload,
+    @Param('commentId', new ParseUUIDPipe({ version: '4' })) commentId: string,
+  ) {
+    return this.forumsService.deleteComment(user, commentId);
   }
 
   @Post('threads/:threadId/upvote')

@@ -17,6 +17,13 @@ export const createMaterialSchema = z.object({
   fileMimeType: z.string().trim().optional(),
 });
 
+export const updateMaterialSchema = createMaterialSchema
+  .omit({ classId: true })
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'At least one field must be provided',
+  });
+
 export const publishAiOutputSchema = z.object({
   outputId: z.string().uuid(),
   publish: z.boolean(),
@@ -29,3 +36,4 @@ export const allowedMaterialCreatorRoles: UserRole[] = [
 
 export type QueryMaterialsInput = z.infer<typeof queryMaterialsSchema>;
 export type CreateMaterialInput = z.infer<typeof createMaterialSchema>;
+export type UpdateMaterialInput = z.infer<typeof updateMaterialSchema>;
