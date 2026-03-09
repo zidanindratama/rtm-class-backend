@@ -64,6 +64,14 @@ enum SubmissionStatus {
   GRADED
 }
 
+enum AssignmentQuestionType {
+  MCQ
+  ESSAY
+  TASK
+  REMEDIAL
+  GENERIC
+}
+
 model User {
   id            String         @id @default(uuid())
   fullName      String
@@ -88,6 +96,7 @@ model User {
   assignmentsCreated Assignment[]          @relation("AssignmentCreator")
   submissions        AssignmentSubmission[] @relation("SubmissionStudent")
   gradedSubmissions  AssignmentSubmission[] @relation("SubmissionGrader")
+  gradedQuestionGrades AssignmentQuestionGrade[] @relation("QuestionGradeGrader")
   blogComments       BlogComment[]
 }
 
@@ -301,10 +310,68 @@ model AssignmentSubmission {
   assignment   Assignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   student      User             @relation("SubmissionStudent", fields: [studentId], references: [id], onDelete: Cascade)
   gradedBy     User?            @relation("SubmissionGrader", fields: [gradedById], references: [id], onDelete: SetNull)
+  attempts     AssignmentSubmissionAttempt[]
+  attachments  AssignmentSubmissionAttachment[]
+  questionGrades AssignmentQuestionGrade[]
 
   @@unique([assignmentId, studentId])
   @@index([studentId, submittedAt])
   @@index([assignmentId, status])
+}
+
+model AssignmentSubmissionAttempt {
+  id            String              @id @default(uuid())
+  submissionId  String
+  attemptNumber Int
+  answers       Json?
+  status        SubmissionStatus    @default(SUBMITTED)
+  score         Float?
+  feedback      String?
+  submittedAt   DateTime            @default(now())
+  createdAt     DateTime            @default(now())
+  submission    AssignmentSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  attachments   AssignmentSubmissionAttachment[]
+  questionGrades AssignmentQuestionGrade[]
+
+  @@unique([submissionId, attemptNumber])
+  @@index([submissionId, submittedAt])
+}
+
+model AssignmentSubmissionAttachment {
+  id          String                     @id @default(uuid())
+  submissionId String
+  attemptId    String?
+  fileUrl      String
+  fileName     String?
+  fileMimeType String?
+  createdAt    DateTime                  @default(now())
+  submission   AssignmentSubmission      @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  attempt      AssignmentSubmissionAttempt? @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+
+  @@index([submissionId])
+  @@index([attemptId])
+}
+
+model AssignmentQuestionGrade {
+  id           String                     @id @default(uuid())
+  submissionId String
+  attemptId    String?
+  questionId   String
+  questionType AssignmentQuestionType
+  score        Float
+  maxScore     Float
+  isCorrect    Boolean?
+  feedback     String?
+  gradedById   String?
+  gradedAt     DateTime                   @default(now())
+  createdAt    DateTime                   @default(now())
+  submission   AssignmentSubmission       @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  attempt      AssignmentSubmissionAttempt? @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  gradedBy     User?                      @relation("QuestionGradeGrader", fields: [gradedById], references: [id], onDelete: SetNull)
+
+  @@index([submissionId, questionId])
+  @@index([attemptId])
+  @@index([gradedById])
 }
 
 model ForumThread {

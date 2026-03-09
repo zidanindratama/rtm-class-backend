@@ -15,12 +15,11 @@ export const createClassSchema = z.object({
   description: z.string().trim().optional(),
 });
 
-export const updateClassSchema = createClassSchema.partial().refine(
-  (value) => Object.keys(value).length > 0,
-  {
+export const updateClassSchema = createClassSchema
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, {
     message: 'At least one field must be provided',
-  },
-);
+  });
 
 export const joinClassSchema = z.object({
   classCode: z.string().trim().min(4).max(32),

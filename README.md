@@ -221,3 +221,6 @@ npm run prisma:studio
 
 ## Changelog
 Detailed history is in [CHANGELOG.md](CHANGELOG.md).
+
+## Deployment Guide
+Detailed deployment steps are in [DEPLOYMENT.md](DEPLOYMENT.md).

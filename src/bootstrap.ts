@@ -18,10 +18,10 @@ export function configureApp(app: INestApplication): void {
       contentSecurityPolicy: {
         useDefaults: true,
         directives: {
-          "default-src": ["'self'"],
-          "img-src": ["'self'", 'data:', 'https:'],
-          "script-src": ["'self'", "'unsafe-inline'"],
-          "style-src": ["'self'", "'unsafe-inline'"],
+          'default-src': ["'self'"],
+          'img-src': ["'self'", 'data:', 'https:'],
+          'script-src': ["'self'", "'unsafe-inline'"],
+          'style-src': ["'self'", "'unsafe-inline'"],
         },
       },
     }),

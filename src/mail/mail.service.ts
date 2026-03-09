@@ -92,7 +92,14 @@ export class MailService {
   private resolveTemplatePath(templateFileName: string): string {
     const candidatePaths = [
       path.join(process.cwd(), 'dist', 'mail', 'templates', templateFileName),
-      path.join(process.cwd(), 'dist', 'src', 'mail', 'templates', templateFileName),
+      path.join(
+        process.cwd(),
+        'dist',
+        'src',
+        'mail',
+        'templates',
+        templateFileName,
+      ),
       path.join(process.cwd(), 'src', 'mail', 'templates', templateFileName),
     ];
 
