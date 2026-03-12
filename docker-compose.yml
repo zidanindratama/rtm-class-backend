@@ -17,15 +17,13 @@ services:
       NODE_OPTIONS: ${NODE_OPTIONS:---no-network-family-autoselection --dns-result-order=ipv4first}
       HTTP_PROXY: ${APP_HTTP_PROXY:-}
       HTTPS_PROXY: ${APP_HTTPS_PROXY:-}
-      NO_PROXY: ${APP_NO_PROXY:-localhost,127.0.0.1,postgres,redis}
+      NO_PROXY: ${APP_NO_PROXY:-localhost,127.0.0.1,redis}
       http_proxy: ${APP_HTTP_PROXY:-}
       https_proxy: ${APP_HTTPS_PROXY:-}
-      no_proxy: ${APP_NO_PROXY:-localhost,127.0.0.1,postgres,redis}
+      no_proxy: ${APP_NO_PROXY:-localhost,127.0.0.1,redis}
     ports:
       - '5000:5000'
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
 
@@ -47,13 +45,10 @@ services:
       NODE_OPTIONS: ${NODE_OPTIONS:---no-network-family-autoselection --dns-result-order=ipv4first}
       HTTP_PROXY: ${APP_HTTP_PROXY:-}
       HTTPS_PROXY: ${APP_HTTPS_PROXY:-}
-      NO_PROXY: ${APP_NO_PROXY:-localhost,127.0.0.1,postgres,redis}
+      NO_PROXY: ${APP_NO_PROXY:-localhost,127.0.0.1,redis}
       http_proxy: ${APP_HTTP_PROXY:-}
       https_proxy: ${APP_HTTPS_PROXY:-}
-      no_proxy: ${APP_NO_PROXY:-localhost,127.0.0.1,postgres,redis}
-    depends_on:
-      postgres:
-        condition: service_healthy
+      no_proxy: ${APP_NO_PROXY:-localhost,127.0.0.1,redis}
 
   api-dev:
     container_name: rtm-class-api-dev
@@ -79,38 +74,18 @@ services:
       TSC_WATCHDIRECTORY: 'DynamicPriorityPolling'
       HTTP_PROXY: ${APP_HTTP_PROXY:-}
       HTTPS_PROXY: ${APP_HTTPS_PROXY:-}
-      NO_PROXY: ${APP_NO_PROXY:-localhost,127.0.0.1,postgres,redis}
+      NO_PROXY: ${APP_NO_PROXY:-localhost,127.0.0.1,redis}
       http_proxy: ${APP_HTTP_PROXY:-}
       https_proxy: ${APP_HTTPS_PROXY:-}
-      no_proxy: ${APP_NO_PROXY:-localhost,127.0.0.1,postgres,redis}
+      no_proxy: ${APP_NO_PROXY:-localhost,127.0.0.1,redis}
     ports:
       - '5000:5000'
     volumes:
       - .:/app
       - /app/node_modules
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
-
-  postgres:
-    container_name: rtm-class-postgres
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - '${POSTGRES_HOST_PORT:-5433}:5432'
-    volumes:
-      - rtm_class_backend_postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   redis:
     container_name: rtm-class-redis
@@ -128,7 +103,5 @@ services:
       retries: 5
 
 volumes:
-  rtm_class_backend_postgres_data:
-    name: rtm_class_backend_postgres_data
   rtm_class_backend_redis_data:
     name: rtm_class_backend_redis_data
