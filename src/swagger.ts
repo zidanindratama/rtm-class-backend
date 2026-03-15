@@ -453,7 +453,7 @@ export function configureSwagger(app: INestApplication): void {
     )
     .addTag(
       'Analytics',
-      'Class-level learning analytics: completion, pass rate, missing submissions, and hardest questions.',
+      'Role-based dashboard analytics and class-level insights: completion, pass rate, missing submissions, and hardest questions.',
     )
     .addTag(
       'Forums',

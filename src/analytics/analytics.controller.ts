@@ -22,7 +22,10 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { JwtPayload } from '../auth/types';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { AnalyticsService } from './analytics.service';
-import { classAnalyticsQuerySchema } from './analytics.schemas';
+import {
+  classAnalyticsQuerySchema,
+  dashboardAnalyticsQuerySchema,
+} from './analytics.schemas';
 
 @Controller({ path: 'analytics', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -36,6 +39,23 @@ import { classAnalyticsQuerySchema } from './analytics.schemas';
 @ApiBearerAuth('access-token')
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
+
+  @Get('dashboard')
+  @ApiOperation({
+    summary: 'Get role-based dashboard analytics (ADMIN/TEACHER/STUDENT)',
+  })
+  @ApiQuery({
+    name: 'weeks',
+    required: false,
+    example: 6,
+    description: 'Number of trailing weeks used for score trend chart (2-12)',
+  })
+  dashboard(
+    @CurrentUser() user: JwtPayload,
+    @Query(new ZodValidationPipe(dashboardAnalyticsQuerySchema)) query: unknown,
+  ) {
+    return this.analyticsService.getDashboardOverview(user, query as any);
+  }
 
   @Get('classes/:classId/dashboard')
   @Roles(UserRole.ADMIN, UserRole.TEACHER)
