@@ -263,6 +263,34 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Patch('change-password')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary:
+      'Change password (authenticated user) - PATCH alias for client compatibility',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['currentPassword', 'newPassword'],
+      properties: {
+        currentPassword: { type: 'string', example: 'OldP@ssw0rd123' },
+        newPassword: {
+          type: 'string',
+          minLength: 8,
+          example: 'NewP@ssw0rd123',
+        },
+      },
+    },
+  })
+  changePasswordPatch(
+    @CurrentUser() user: JwtPayload,
+    @Body(new ZodValidationPipe(changePasswordSchema)) dto: unknown,
+  ) {
+    return this.authService.changePassword(user, dto as any);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Patch('profile')
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Update own profile' })
