@@ -3,13 +3,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, UserRole } from '@prisma/client';
+import { AIJobStatus, MaterialStatus, Prisma, UserRole } from '@prisma/client';
 import { JwtPayload } from '../auth/types';
 import { ClassesService } from '../classes/classes.service';
 import { buildListMeta, clampSortOrder } from '../common/utils/list-query';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateMaterialInput,
+  MaterialJobsQueryInput,
   QueryMaterialsInput,
   UpdateMaterialInput,
 } from './materials.schemas';
@@ -210,16 +211,7 @@ export class MaterialsService {
   }
 
   async getMaterialOutputs(user: JwtPayload, materialId: string) {
-    const material = await this.prisma.material.findUnique({
-      where: { id: materialId },
-      select: { id: true, classroomId: true },
-    });
-
-    if (!material) {
-      throw new NotFoundException('Material not found');
-    }
-
-    await this.classesService.assertClassAccess(user, material.classroomId);
+    await this.getMaterialWithClassAccess(user, materialId);
 
     const outputs = await this.prisma.aiOutput.findMany({
       where: { materialId },
@@ -242,6 +234,78 @@ export class MaterialsService {
     return {
       message: 'Material AI outputs fetched',
       data: outputs,
+    };
+  }
+
+  async getMaterialJobs(
+    user: JwtPayload,
+    materialId: string,
+    query: MaterialJobsQueryInput,
+  ) {
+    const material = await this.getMaterialWithClassAccess(user, materialId);
+
+    const jobs = await this.prisma.aiJob.findMany({
+      where: { materialId },
+      include: {
+        requestedBy: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            role: true,
+          },
+        },
+        output: {
+          select: {
+            id: true,
+            type: true,
+            isPublished: true,
+            publishedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const includeOverview = query.includeOverview === true;
+    const overview = includeOverview
+      ? this.buildAiOverview(material.id, material.status, jobs)
+      : undefined;
+
+    return {
+      message: 'Material AI jobs fetched',
+      data: {
+        materialId: material.id,
+        materialStatus: material.status,
+        jobs,
+        overview,
+      },
+    };
+  }
+
+  async getMaterialAiOverview(user: JwtPayload, materialId: string) {
+    const material = await this.getMaterialWithClassAccess(user, materialId);
+
+    const jobs = await this.prisma.aiJob.findMany({
+      where: { materialId },
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        output: {
+          select: {
+            id: true,
+            isPublished: true,
+          },
+        },
+      },
+    });
+
+    return {
+      message: 'Material AI overview fetched',
+      data: this.buildAiOverview(material.id, material.status, jobs),
     };
   }
 
@@ -283,6 +347,93 @@ export class MaterialsService {
     }
 
     await this.classesService.assertClassAccess(user, classId);
+  }
+
+  private async getMaterialWithClassAccess(user: JwtPayload, materialId: string) {
+    const material = await this.prisma.material.findUnique({
+      where: { id: materialId },
+      select: { id: true, classroomId: true, status: true },
+    });
+
+    if (!material) {
+      throw new NotFoundException('Material not found');
+    }
+
+    await this.classesService.assertClassAccess(user, material.classroomId);
+    return material;
+  }
+
+  private buildAiOverview(
+    materialId: string,
+    materialStatus: MaterialStatus,
+    jobs: Array<{
+      id: string;
+      type: string;
+      status: AIJobStatus;
+      output?: { id: string; isPublished?: boolean | null } | null;
+    }>,
+  ) {
+    const jobsByStatus = {
+      accepted: 0,
+      processing: 0,
+      succeeded: 0,
+      failed_processing: 0,
+      failed_delivery: 0,
+    };
+
+    const jobsByType = {
+      MCQ: 0,
+      ESSAY: 0,
+      SUMMARY: 0,
+      LKPD: 0,
+      REMEDIAL: 0,
+      DISCUSSION_TOPIC: 0,
+    };
+
+    let outputCount = 0;
+    let publishedOutputCount = 0;
+    for (const job of jobs) {
+      if (job.status in jobsByStatus) {
+        jobsByStatus[job.status] += 1;
+      }
+
+      if (job.type in jobsByType) {
+        jobsByType[job.type as keyof typeof jobsByType] += 1;
+      }
+
+      if (job.output) {
+        outputCount += 1;
+        if (job.output.isPublished) {
+          publishedOutputCount += 1;
+        }
+      }
+    }
+
+    const totalJobs = jobs.length;
+    const completedJobs = jobsByStatus.succeeded;
+    const failedJobs =
+      jobsByStatus.failed_processing + jobsByStatus.failed_delivery;
+    const inProgressJobs = jobsByStatus.accepted + jobsByStatus.processing;
+
+    const completionRate =
+      totalJobs > 0
+        ? Number(((completedJobs / totalJobs) * 100).toFixed(2))
+        : 0;
+
+    return {
+      materialId,
+      materialStatus,
+      totalJobs,
+      completedJobs,
+      failedJobs,
+      inProgressJobs,
+      completionRate,
+      hasPendingJobs: inProgressJobs > 0,
+      jobsByStatus,
+      jobsByType,
+      outputCount,
+      publishedOutputCount,
+    };
   }
 
   private assertMaterialOwnerOrAdmin(

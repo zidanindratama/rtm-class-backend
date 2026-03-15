@@ -29,6 +29,15 @@ export const publishAiOutputSchema = z.object({
   publish: z.boolean(),
 });
 
+export const materialJobsQuerySchema = z.object({
+  includeOverview: z
+    .preprocess(
+      (value) => (value === '' || value === undefined ? undefined : value),
+      z.coerce.boolean().optional(),
+    )
+    .optional(),
+});
+
 export const allowedMaterialCreatorRoles: UserRole[] = [
   UserRole.ADMIN,
   UserRole.TEACHER,
@@ -37,3 +46,4 @@ export const allowedMaterialCreatorRoles: UserRole[] = [
 export type QueryMaterialsInput = z.infer<typeof queryMaterialsSchema>;
 export type CreateMaterialInput = z.infer<typeof createMaterialSchema>;
 export type UpdateMaterialInput = z.infer<typeof updateMaterialSchema>;
+export type MaterialJobsQueryInput = z.infer<typeof materialJobsQuerySchema>;

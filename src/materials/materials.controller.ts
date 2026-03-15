@@ -25,6 +25,7 @@ import { JwtPayload } from '../auth/types';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import {
   createMaterialSchema,
+  materialJobsQuerySchema,
   queryMaterialsSchema,
   updateMaterialSchema,
 } from './materials.schemas';
@@ -153,5 +154,39 @@ export class MaterialsController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) materialId: string,
   ) {
     return this.materialsService.getMaterialOutputs(user, materialId);
+  }
+
+  @Get(':id/jobs')
+  @ApiOperation({ summary: 'List AI jobs for material (with optional overview)' })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  @ApiQuery({
+    name: 'includeOverview',
+    required: false,
+    schema: { type: 'boolean', default: false },
+  })
+  getMaterialJobs(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) materialId: string,
+    @Query(new ZodValidationPipe(materialJobsQuerySchema)) query: unknown,
+  ) {
+    return this.materialsService.getMaterialJobs(user, materialId, query as any);
+  }
+
+  @Get(':id/ai-overview')
+  @ApiOperation({ summary: 'Get AI progress overview for one material' })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
+  getMaterialAiOverview(
+    @CurrentUser() user: JwtPayload,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) materialId: string,
+  ) {
+    return this.materialsService.getMaterialAiOverview(user, materialId);
   }
 }
