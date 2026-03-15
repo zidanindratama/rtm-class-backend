@@ -1,4 +1,4 @@
-import { UserRole } from '@prisma/client';
+import { AssignmentStatus, UserRole } from '@prisma/client';
 import { z } from 'zod';
 import { paginationQuerySchema } from '../common/schemas/pagination.schema';
 
@@ -38,6 +38,24 @@ export const materialJobsQuerySchema = z.object({
     .optional(),
 });
 
+export const editAiOutputSchema = z.object({
+  editedContent: z.record(z.string(), z.unknown()),
+});
+
+export const setAiOutputPublishSchema = z.object({
+  publish: z.boolean(),
+});
+
+export const createAssignmentFromOutputSchema = z.object({
+  title: z.string().trim().min(3).optional(),
+  description: z.string().trim().optional(),
+  dueAt: z.coerce.date().optional(),
+  status: z
+    .nativeEnum(AssignmentStatus)
+    .optional()
+    .default(AssignmentStatus.DRAFT),
+});
+
 export const allowedMaterialCreatorRoles: UserRole[] = [
   UserRole.ADMIN,
   UserRole.TEACHER,
@@ -47,3 +65,8 @@ export type QueryMaterialsInput = z.infer<typeof queryMaterialsSchema>;
 export type CreateMaterialInput = z.infer<typeof createMaterialSchema>;
 export type UpdateMaterialInput = z.infer<typeof updateMaterialSchema>;
 export type MaterialJobsQueryInput = z.infer<typeof materialJobsQuerySchema>;
+export type EditAiOutputInput = z.infer<typeof editAiOutputSchema>;
+export type SetAiOutputPublishInput = z.infer<typeof setAiOutputPublishSchema>;
+export type CreateAssignmentFromOutputInput = z.infer<
+  typeof createAssignmentFromOutputSchema
+>;
