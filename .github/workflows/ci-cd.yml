@@ -60,5 +60,4 @@ jobs:
             cd "$APP_DIR"
             git checkout main
             git pull --ff-only origin main
-            chmod +x scripts/deploy.sh
-            USE_EXTERNAL_INFRA=true APP_DIR="$APP_DIR" ./scripts/deploy.sh
+            USE_EXTERNAL_INFRA=true APP_DIR="$APP_DIR" sh ./scripts/deploy.sh
