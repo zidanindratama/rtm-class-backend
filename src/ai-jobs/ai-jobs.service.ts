@@ -18,12 +18,11 @@ import { firstValueFrom } from 'rxjs';
 import { JwtPayload } from '../auth/types';
 import { ClassesService } from '../classes/classes.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
 import { EnqueueAiTransformInput } from './ai-jobs.schemas';
+import { RedisService } from 'src/redis/redis.service';
 
 const WORKER_INTERVAL_MS = 5000;
 const OAUTH_CACHE_KEY = 'rtm:ai:oauth_token';
-
 @Injectable()
 export class AiJobsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AiJobsService.name);
@@ -128,6 +127,71 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  private stringifyHttpPayload(payload: unknown): string {
+    if (payload === null || payload === undefined) return '';
+    if (typeof payload === 'string') return payload;
+
+    try {
+      return JSON.stringify(payload);
+    } catch {
+      return String(payload);
+    }
+  }
+
+  private async getOAuthAccessToken(): Promise<string> {
+    const now = Math.floor(Date.now() / 1000);
+    const cachedToken = await this.redisService.get(OAUTH_CACHE_KEY);
+    if (cachedToken) {
+      return cachedToken;
+    }
+
+    const baseUrl = this.requireEnv('AI_BASE_URL');
+    const clientId = this.requireEnv('AI_CLIENT_ID');
+    const clientSecret = this.requireEnv('AI_CLIENT_SECRET');
+    const scope = process.env.AI_SCOPE ?? 'material:write lkpd:write lkpd:read';
+    const tokenEndpoint =
+      process.env.AI_OAUTH_TOKEN_ENDPOINT ?? '/api/oauth/token';
+
+    const body = new URLSearchParams();
+    body.set('grant_type', 'client_credentials');
+    body.set('client_id', clientId);
+    body.set('client_secret', clientSecret);
+    body.set('scope', scope);
+
+    const response = await firstValueFrom(
+      this.httpService.post<{
+        access_token?: string;
+        expires_in?: number;
+        data?: { access_token?: string; expires_in?: number };
+      }>(`${baseUrl}${tokenEndpoint}`, body.toString(), {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        validateStatus: () => true,
+      }),
+    );
+
+    if (!this.isSuccessStatus(response.status)) {
+      const errorText = this.stringifyHttpPayload(response.data);
+      throw new UnauthorizedException(
+        `Failed to obtain AI OAuth access token (${response.status})${errorText ? `: ${errorText}` : ''}`,
+      );
+    }
+
+    const json = response.data;
+    const token = json.access_token ?? json.data?.access_token;
+    const expiresIn = json.expires_in ?? json.data?.expires_in ?? 300;
+    if (!token) {
+      throw new UnauthorizedException(
+        'AI OAuth response does not contain access_token',
+      );
+    }
+
+    const ttl = Math.max(30, expiresIn - 30);
+    await this.redisService.setEx(OAUTH_CACHE_KEY, token, ttl);
+
+    this.logger.debug(`AI OAuth token refreshed. expires_at=${now + ttl}`);
+    return token;
+  }
+
   async acknowledgeCallback(jobId: string) {
     const job = await this.prisma.aiJob.findUnique({
       where: { id: jobId },
@@ -206,9 +270,8 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
   }) {
     try {
       const endpointPath = this.endpointPathFromJobType(job.type);
-      const accessToken = await this.getOAuthAccessToken();
       const baseUrl = this.requireEnv('AI_BASE_URL');
-
+      const accessToken = await this.getOAuthAccessToken();
       const materialFileResponse = await firstValueFrom(
         this.httpService.get<ArrayBuffer>(job.material.fileUrl, {
           responseType: 'arraybuffer',
@@ -240,10 +303,10 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
 
       const response = await firstValueFrom(
         this.httpService.post(`${baseUrl}${endpointPath}`, form, {
+          validateStatus: () => true,
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
-          validateStatus: () => true,
         }),
       );
 
@@ -266,8 +329,7 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
         });
       }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unknown AI dispatch error';
+      const message = error instanceof Error ? error.message : 'Unknown AI dispatch error';
       await this.prisma.aiJob.update({
         where: { id: job.id },
         data: {
@@ -311,7 +373,7 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
         'summary_max_words',
         String(this.numberFromInput(parameters.summaryMaxWords, 200)),
       );
-      form.set('mcp_enabled', String(mcqEnabled));
+      form.set('mcp_enabled', String(mcpEnabled));
     }
   }
 
@@ -388,63 +450,6 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
     return path;
   }
 
-  private async getOAuthAccessToken(): Promise<string> {
-    const now = Math.floor(Date.now() / 1000);
-    const cachedToken = await this.redisService.get(OAUTH_CACHE_KEY);
-    if (cachedToken) {
-      return cachedToken;
-    }
-
-    const baseUrl = this.requireEnv('AI_BASE_URL');
-    const clientId = this.getEnvAny(['AI_CLIENT_ID', 'OAUTH_CLIENT_ID']);
-    const clientSecret = this.getEnvAny([
-      'AI_CLIENT_SECRET',
-      'OAUTH_CLIENT_SECRET',
-    ]);
-    const scope = process.env.AI_SCOPE ?? 'material:write lkpd:write lkpd:read';
-    const tokenEndpoint =
-      process.env.AI_OAUTH_TOKEN_ENDPOINT ?? '/api/oauth/token';
-
-    const body = new URLSearchParams();
-    body.set('grant_type', 'client_credentials');
-    body.set('client_id', clientId);
-    body.set('client_secret', clientSecret);
-    body.set('scope', scope);
-
-    const response = await firstValueFrom(
-      this.httpService.post<{
-        access_token?: string;
-        expires_in?: number;
-        data?: { access_token?: string; expires_in?: number };
-      }>(`${baseUrl}${tokenEndpoint}`, body.toString(), {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        validateStatus: () => true,
-      }),
-    );
-
-    if (!this.isSuccessStatus(response.status)) {
-      const errorText = this.stringifyHttpPayload(response.data);
-      throw new UnauthorizedException(
-        `Failed to obtain AI OAuth access token (${response.status})${errorText ? `: ${errorText}` : ''}`,
-      );
-    }
-
-    const json = response.data;
-    const token = json.access_token ?? json.data?.access_token;
-    const expiresIn = json.expires_in ?? json.data?.expires_in ?? 300;
-    if (!token) {
-      throw new UnauthorizedException(
-        'AI OAuth response does not contain access_token',
-      );
-    }
-
-    const ttl = Math.max(30, expiresIn - 30);
-    await this.redisService.setEx(OAUTH_CACHE_KEY, token, ttl);
-
-    this.logger.debug(`AI OAuth token refreshed. expires_at=${now + ttl}`);
-    return token;
-  }
-
   private async refreshMaterialStatus(materialId: string): Promise<void> {
     const jobs = await this.prisma.aiJob.findMany({
       where: { materialId },
@@ -497,14 +502,6 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
     return value;
   }
 
-  private getEnvAny(keys: string[]): string {
-    for (const key of keys) {
-      const value = process.env[key]?.trim();
-      if (value) return value;
-    }
-    throw new Error(`Missing required env vars: ${keys.join(' or ')}`);
-  }
-
   private numberFromInput(input: unknown, fallback: number): number {
     const value = Number(input);
     if (Number.isFinite(value) && value > 0) return Math.floor(value);
@@ -523,16 +520,5 @@ export class AiJobsService implements OnModuleInit, OnModuleDestroy {
 
   private isSuccessStatus(status: number): boolean {
     return status >= 200 && status < 300;
-  }
-
-  private stringifyHttpPayload(payload: unknown): string {
-    if (payload === null || payload === undefined) return '';
-    if (typeof payload === 'string') return payload;
-
-    try {
-      return JSON.stringify(payload);
-    } catch {
-      return String(payload);
-    }
   }
 }
