@@ -56,8 +56,8 @@ nano .env
 Minimum `.env` production checklist:
 - `JWT_ACCESS_SECRET`
 - `JWT_REFRESH_SECRET`
-- `DATABASE_URL` (use host `postgres` inside docker network)
-- `REDIS_URL` (use host `redis` inside docker network)
+- `DATABASE_URL` (use host `postgres` only if using dockerized DB from this compose stack)
+- `REDIS_URL` (use host `redis` only if using dockerized Redis from this compose stack)
 - `CORS_ORIGINS`
 - `EMAIL_*` (if OTP email enabled)
 - `CLOUDINARY_*` (if upload enabled)
@@ -67,6 +67,14 @@ Deploy:
 chmod +x scripts/deploy.sh
 APP_DIR=/opt/rtm-class/rtm-class-backend ./scripts/deploy.sh
 ```
+
+If production uses external PostgreSQL/Redis (not Docker services in this repo):
+```bash
+USE_EXTERNAL_INFRA=true APP_DIR=/opt/rtm-class/rtm-class-backend ./scripts/deploy.sh
+```
+Notes:
+- In this mode, deploy script skips `postgres` and `redis` containers.
+- Ensure `.env` points to external endpoints (for example `DATABASE_URL` and `REDIS_URL` must not use docker hostnames like `postgres` / `redis`).
 
 Update deploy:
 ```bash

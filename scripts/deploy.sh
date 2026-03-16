@@ -3,6 +3,7 @@
 set -eu
 
 APP_DIR="${APP_DIR:-$(pwd)}"
+USE_EXTERNAL_INFRA="${USE_EXTERNAL_INFRA:-false}"
 
 cd "$APP_DIR"
 
@@ -13,7 +14,15 @@ fi
 
 docker compose pull api || true
 docker compose --profile prod build api api-migrate
-docker compose --profile prod up -d postgres redis
-docker compose --profile prod run --rm api-migrate
-docker compose --profile prod up -d api
+
+if [ "$USE_EXTERNAL_INFRA" = "true" ]; then
+  echo "USE_EXTERNAL_INFRA=true -> skip postgres/redis containers"
+  docker compose --profile prod run --rm --no-deps api-migrate
+  docker compose --profile prod up -d --no-deps api
+else
+  docker compose --profile prod up -d postgres redis
+  docker compose --profile prod run --rm api-migrate
+  docker compose --profile prod up -d api
+fi
+
 docker compose ps

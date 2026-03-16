@@ -143,13 +143,19 @@ cp .env.example .env
 - set strong JWT secrets
 - set real `CORS_ORIGINS`
 - set real Cloudinary and email credentials
-- keep `DATABASE_URL` host as `postgres`
-- keep `REDIS_URL` host as `redis`
+- if using Docker infra from this compose stack, keep `DATABASE_URL` host as `postgres`
+- if using Docker infra from this compose stack, keep `REDIS_URL` host as `redis`
 5. Run the first deployment manually:
 ```bash
 chmod +x scripts/deploy.sh
 APP_DIR=/opt/rtm-class-backend ./scripts/deploy.sh
 ```
+
+If your VPS uses external PostgreSQL/Redis (outside this compose stack), run:
+```bash
+USE_EXTERNAL_INFRA=true APP_DIR=/opt/rtm-class-backend ./scripts/deploy.sh
+```
+and set `.env` so `DATABASE_URL` and `REDIS_URL` point to the external hosts.
 
 ### GitHub Actions auto-deploy
 The workflow file is at `.github/workflows/ci-cd.yml`.
